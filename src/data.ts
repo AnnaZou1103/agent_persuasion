@@ -1,5 +1,5 @@
 import * as React from 'react';
-export const ChatBotType: SystemPurposeId[] =["NEU_high_2"]
+export const ChatBotType: SystemPurposeId[] =["AGR_high_2","AGR_low_2","CON_high_2","CON_low_2","NEU_high_2","NEU_low_1","EXT_high_6","EXT_low_5","OPE_high_8","OPE_low_9"]
 export type SystemPurposeId = "AGR_high_2"|"AGR_low_2"|"CON_high_2"|"CON_low_2"|"NEU_high_2"|"NEU_low_1"|"EXT_high_6"|"EXT_low_5"|"OPE_high_8"|"OPE_low_9"|'Custom'
 
 export const defaultSystemPurposeId: SystemPurposeId = ChatBotType[Math.floor(Math.random() * ChatBotType.length)];
