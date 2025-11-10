@@ -100,9 +100,10 @@ export const useModelsStore = create<ModelsData & ModelsActions>()(
       addLLMs: (llms: DLLM[]) =>
         set(state => {
           const newLlms = [...llms, ...state.llms.filter(llm => !llms.find(m => m.id === llm.id))];
+          // Force GPT-4o for all model types
           return {
             llms: newLlms,
-            ...updateSelectedIds(newLlms, 'openai-gpt-4o', state.fastLLMId, state.funcLLMId),
+            ...updateSelectedIds(newLlms, 'openai-gpt-4o', 'openai-gpt-4o', 'openai-gpt-4o'),
           };
         }),
 
@@ -187,9 +188,10 @@ export const useModelsStore = create<ModelsData & ModelsActions>()(
 );
 
 
-const defaultChatSuffixPreference = ['gpt-4o','gpt-4o-mini','gpt-4-0613', 'gpt-4', 'gpt-4-32k', 'gpt-3.5-turbo'];
-const defaultFastSuffixPreference = ['gpt-3.5-turbo-0613', 'gpt-3.5-turbo-16k-0613', 'gpt-3.5-turbo-16k', 'gpt-3.5-turbo'];
-const defaultFuncSuffixPreference = ['gpt-3.5-turbo-0613', 'gpt-4-0613'];
+// Force GPT-4o as the only default model - user cannot change
+const defaultChatSuffixPreference = ['gpt-4o'];
+const defaultFastSuffixPreference = ['gpt-4o'];
+const defaultFuncSuffixPreference = ['gpt-4o'];
 
 export function findLLMOrThrow<TSourceSetup, TLLMOptions>(llmId: DLLMId): DLLM<TSourceSetup, TLLMOptions> {
   const llm = useModelsStore.getState().llms.find(llm => llm.id === llmId);

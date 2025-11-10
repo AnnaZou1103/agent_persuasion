@@ -8,12 +8,12 @@
  */
 export const Brand = {
   Title: {
-    Base: 'interactive-eval',
-    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'interactive-eval',
+    Base: 'conversation-search',
+    Common: (process.env.NODE_ENV === 'development' ? '[DEV] ' : '') + 'conversation-search',
   },
   Meta: {
     Description: 'Open-source AI web interface to help you learn, think, and do. AI personas, superior privacy, advanced features, and fun UX.',
-    SiteName: 'interactive-eval',
+    SiteName: 'conversation-search',
     ThemeColor: '#32383E',
     TwitterSite: '@enricoros',
   },
@@ -21,7 +21,7 @@ export const Brand = {
     Home: 'https://big-agi.com',
     // App: 'https://get.big-agi.com',
     CardImage: 'https://big-agi.com/icons/card-dark-1200.png',
-    OpenRepo: 'https://github.com/AnnaZou1103/interactive_eval',
+    OpenRepo: 'https://github.com/AnnaZou1103/conversation_search',
     SupportInvite: 'https://discord.gg/MkH4qj2Jp9',
     // Twitter: 'https://www.twitter.com/enricoros',
     PrivacyPolicy: 'https://big-agi.com/privacy',

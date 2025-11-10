@@ -14,8 +14,8 @@ export function ChatDropdowns(props: {
 
   return <>
 
-    {/* Model selector */}
-    {chatLLMDropdown}
+    {/* Model selector - Hidden: GPT-4o is default and locked */}
+    {/* {chatLLMDropdown} */}
 
     {/* Persona selector */}
     {/* {personaDropdown} */}

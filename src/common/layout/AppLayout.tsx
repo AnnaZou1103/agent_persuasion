@@ -59,7 +59,8 @@ export function AppLayout(props: {
 
       <SettingsModal />
 
-      <ModelsModal suspendAutoModelsSetup={props.suspendAutoModelsSetup} />
+      {/* ModelsModal disabled - GPT-4o is default and locked */}
+      {/* <ModelsModal suspendAutoModelsSetup={props.suspendAutoModelsSetup} /> */}
 
     </NoSSR>
   );

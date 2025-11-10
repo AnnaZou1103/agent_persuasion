@@ -10,6 +10,9 @@ let nextConfig = {
     HAS_SERVER_KEY_OPENAI: !!process.env.OPENAI_API_KEY,
     HAS_SERVER_KEY_OPENROUTER: !!process.env.OPENROUTER_API_KEY,
     HAS_SERVER_KEY_PRODIA: !!process.env.PRODIA_API_KEY,
+    // Pinecone configuration
+    PINECONE_API_KEY: process.env.PINECONE_API_KEY,
+    PINECONE_ASSISTANT_NAME: process.env.PINECONE_ASSISTANT_NAME,
   },
   webpack: (config, _options) => {
     // @mui/joy: anything material gets redirected to Joy

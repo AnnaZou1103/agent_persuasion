@@ -1,6 +1,6 @@
 import * as React from 'react';
 
-import { Box, Button, Divider, Modal, ModalClose, ModalDialog, ModalOverflow, Typography } from '@mui/joy';
+import { Box, Divider, Modal, ModalClose, ModalDialog, ModalOverflow, Typography } from '@mui/joy';
 import { SxProps } from '@mui/joy/styles/types';
 
 
@@ -41,12 +41,9 @@ export function GoodModal(props: {
 
           {props.dividers === true && <Divider />}
 
-          <Box sx={{ mt: 'auto', display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
+          {props.startButton && <Box sx={{ mt: 'auto', display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'space-between' }}>
             {props.startButton}
-            <Button variant='solid' color='neutral' onClick={props.onClose} sx={{ ml: 'auto', minWidth: 100 }}>
-              Close
-            </Button>
-          </Box>
+          </Box>}
 
         </ModalDialog>
       </ModalOverflow>

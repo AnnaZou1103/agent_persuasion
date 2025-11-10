@@ -33,13 +33,12 @@ export interface DConversation {
 
 export const initialmessage: DMessage = 
 {id: uuidv4(),
-  text:"Welcome to our chatbot! Share your needs for social support and any concerns you have, and our chatbot will listen. What kind of personal concern do you have?",
+  text:"Hello! I'm here to help you explore and learn about various topics through conversation. What would you like to discuss or learn more about today?",
   sender: 'Bot',
   avatar: null,
   typing: false,
   role: 'assistant',
-  isRated: false,
-  purposeId: defaultSystemPurposeId,
+  purposeId: 'suggestion',
   tokenCount: 0,
   created: Date.now(),
   updated: null,
@@ -147,7 +146,6 @@ export interface DMessage {
   avatar: string | null;            // null, or image url
   typing: boolean;
   role: 'assistant' | 'system' | 'user';
-  isRated: boolean;
 
   purposeId?: SystemPurposeId;      // only assistant/system
   originLLM?: string;               // only assistant - model that generated this message, goes beyond known models
@@ -168,7 +166,6 @@ export function createDMessage(role: DMessage['role'], text: string): DMessage {
     avatar: null,
     typing: false,
     role: role,
-    isRated: false,
     tokenCount: 0,
     created: Date.now(),
     updated: null,

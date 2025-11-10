@@ -19,6 +19,7 @@ import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
+import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
 
 import { canUseElevenLabs, speakText } from '~/modules/elevenlabs/elevenlabs.client';
 import { canUseProdia } from '~/modules/prodia/prodia.client';
@@ -86,19 +87,16 @@ export function makeAvatar(messageAvatar: string | null, messageRole: DMessage['
       // display the purpose symbol
       if (messageOriginLLM === 'prodia')
         return <PaletteOutlinedIcon sx={iconSx} />;
-      const symbol = SystemPurposes[messagePurposeId as SystemPurposeId]?.symbol;
-      if (symbol)
-        return <Box
-          sx={{
-            fontSize: '24px',
-            textAlign: 'center',
-            width: '100%', minWidth: `${iconSx.width}px`, lineHeight: `${iconSx.height}px`,
-          }}
-        >
-          {symbol}
-        </Box>;
-      // default assistant avatar
-      return <SmartToyOutlinedIcon sx={iconSx} />; // https://mui.com/static/images/avatar/2.jpg
+      // Always use emoji lightbulb for conversational search
+      return <Box
+        sx={{
+          fontSize: '24px',
+          textAlign: 'center',
+          width: '100%', minWidth: `${iconSx.width}px`, lineHeight: `${iconSx.height}px`,
+        }}
+      >
+        💡
+      </Box>;
 
     case 'user':
       return <Face6Icon sx={iconSx} />;            // https://www.svgrepo.com/show/306500/openai.svg
@@ -166,7 +164,6 @@ export function ChatMessage(props: { message: DMessage, diffText?: string, showD
     avatar: messageAvatar,
     typing: messageTyping,
     role: messageRole,
-    isRated: messageRateStatus,
     purposeId: messagePurposeId,
     originLLM: messageOriginLLM,
     created: messageCreated,
@@ -450,18 +447,14 @@ export function ChatMessage(props: { message: DMessage, diffText?: string, showD
                     onChange={(event) => {
                       if (event.target.checked) {
                         if(activeEvaluationId){
-                          if (!messageRateStatus){
-                            editMessage(activeEvaluationId, messageId, { isRated: true, selected: choice}, true)
-                            const conversation = useChatStore.getState().conversations.find(c => c.id === activeEvaluationId);
-                            const index = conversation?.messages.length;
-                            if (index && index<SurveyQuestions.length){
-                              useChatStore.getState().appendMessage(activeEvaluationId, SurveyQuestions[index]);
-                              if (index == SurveyQuestions.length-1){
-                                useChatStore.getState().setEvaluationStatus(true);
-                              }
+                          editMessage(activeEvaluationId, messageId, { selected: choice}, true)
+                          const conversation = useChatStore.getState().conversations.find(c => c.id === activeEvaluationId);
+                          const index = conversation?.messages.length;
+                          if (index && index<SurveyQuestions.length){
+                            useChatStore.getState().appendMessage(activeEvaluationId, SurveyQuestions[index]);
+                            if (index == SurveyQuestions.length-1){
+                              useChatStore.getState().setEvaluationStatus(true);
                             }
-                          }else{
-                            editMessage(activeEvaluationId,  messageId, {selected: choice}, true)
                           }
                         }
                       }

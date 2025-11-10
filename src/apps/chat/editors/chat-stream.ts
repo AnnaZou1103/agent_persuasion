@@ -9,6 +9,7 @@ import { useElevenlabsStore } from '~/modules/elevenlabs/store-elevenlabs';
 import { DMessage, useChatStore } from '~/common/state/store-chats';
 
 import { createAssistantTypingMessage, updatePurposeInHistory } from './editors';
+import { processUserMessageWithSearch, prepareHistoryWithSearchContext, updateSearchHistory } from '~/modules/pinecone/chat-integration';
 
 
 /**
@@ -16,11 +17,41 @@ import { createAssistantTypingMessage, updatePurposeInHistory } from './editors'
  */
 export async function runAssistantUpdatingState(conversationId: string, history: DMessage[], assistantLlmId: DLLMId, systemPurpose: SystemPurposeId, _autoTitle: boolean, enableFollowUps: boolean) {
 
-  // update the system message from the active Purpose, if not manually edited
-  history = updatePurposeInHistory(conversationId, history, systemPurpose);
+  // Get the last user message for search
+  const lastUserMessage = history.length > 0 && history[history.length - 1].role === 'user' 
+    ? history[history.length - 1].text 
+    : '';
+
+  // Try to enhance with conversational search
+  let enhancedHistory = history;
+  let assistantResponseText = '';
+  
+  if (lastUserMessage) {
+    try {
+      const searchResult = await processUserMessageWithSearch(lastUserMessage, history);
+      
+      if (searchResult.shouldEnhance && searchResult.enhancedSystemMessage) {
+        // Use enhanced system message with retrieved context
+        enhancedHistory = prepareHistoryWithSearchContext(
+          history,
+          searchResult.enhancedSystemMessage,
+          systemPurpose
+        );
+      } else {
+        // Fall back to normal system message update
+        enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
+      }
+    } catch (error) {
+      console.error('Error in conversational search, falling back to normal mode:', error);
+      enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
+    }
+  } else {
+    // No user message, use normal system message update
+    enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
+  }
 
   // create a blank and 'typing' message for the assistant
-  const assistantMessageId = createAssistantTypingMessage(conversationId, assistantLlmId, history[0].purposeId, '...');
+  const assistantMessageId = createAssistantTypingMessage(conversationId, assistantLlmId, enhancedHistory[0].purposeId, '...');
 
   // when an abort controller is set, the UI switches to the "stop" mode
   const controller = new AbortController();
@@ -28,8 +59,18 @@ export async function runAssistantUpdatingState(conversationId: string, history:
   startTyping(conversationId, controller);
 
   // stream the assistant's messages
-  await streamAssistantMessage(assistantLlmId, history, controller.signal, (updatedMessage) =>
-    editMessage(conversationId, assistantMessageId, updatedMessage, false));
+  await streamAssistantMessage(assistantLlmId, enhancedHistory, controller.signal, (updatedMessage) => {
+    editMessage(conversationId, assistantMessageId, updatedMessage, false);
+    // Track assistant response for search history
+    if (updatedMessage.text) {
+      assistantResponseText = updatedMessage.text;
+    }
+  });
+
+  // Update conversational search history
+  if (lastUserMessage && assistantResponseText) {
+    updateSearchHistory(lastUserMessage, assistantResponseText);
+  }
 
   // clear to send, again
   startTyping(conversationId, null);
@@ -50,7 +91,7 @@ async function streamAssistantMessage(
   editMessage: (updatedMessage: Partial<DMessage>) => void,
 ) {
 
-  // 📢 TTS: speak the first line, if configured
+  // TTS: speak the first line, if configured
   const speakFirstLine = useElevenlabsStore.getState().elevenLabsAutoSpeak === 'firstLine';
   let firstLineSpoken = false;
 

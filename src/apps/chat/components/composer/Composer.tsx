@@ -12,9 +12,9 @@ import MicIcon from '@mui/icons-material/Mic';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import SendIcon from '@mui/icons-material/Send';
+import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import StopOutlinedIcon from '@mui/icons-material/StopOutlined';
 import TelegramIcon from '@mui/icons-material/Telegram';
-import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 
 import { APP_CALL_ENABLED } from '../../../call/AppCall';
 
@@ -460,26 +460,6 @@ export function Composer(props: {
       saveConversation(currentEvaluationId)
   };
 
-  const handleRateClicked=() => {
-    if (isEvaluation){
-      useChatStore.getState().setActiveEvaluationId(null);
-    }else{
-      const activeConversationId=useChatStore.getState().activeConversationId;
-      if (activeConversationId){
-        const activeConversation=useChatStore.getState().conversations.find((conversation: DConversation): boolean => conversation.id === activeConversationId);
-        if (activeConversation?.messages.length==0){
-          useChatStore.getState().setActiveEvaluationId(null);
-          return
-        }
-
-        if (activeConversation?.evaluationId == undefined){
-          useChatStore.getState().createEvaluation();
-        }else{
-          useChatStore.getState().setActiveEvaluationId(activeConversation?.evaluationId);
-        }
-      }
-    }
-  };
 
   const isImmediate = chatModeId === 'immediate';
   const isWriteUser = chatModeId === 'write-user';
@@ -555,6 +535,16 @@ export function Composer(props: {
                 {props.isDeveloperMode ? 'Paste code' : 'Paste'}
               </Button>
             </Tooltip>
+
+            {/* Responsive Settings button */}
+            <IconButton onClick={() => useUIStateStore.getState().openSettings(4)} sx={{ ...hideOnDesktop }}>
+              <SettingsOutlinedIcon />
+            </IconButton>
+            <Button fullWidth variant='plain' color='neutral' startDecorator={<SettingsOutlinedIcon />} 
+                    onClick={() => useUIStateStore.getState().openSettings(4)}
+                    sx={{ ...hideOnMobile, justifyContent: 'flex-start' }}>
+              Settings
+            </Button>
 
             <input type='file' multiple hidden ref={attachmentFileInputRef} onChange={handleLoadAttachment} />
 
@@ -712,26 +702,6 @@ export function Composer(props: {
 
               {(isDraw || isDrawPlus) && <DrawOptionsButtonDesktop onClick={handleDrawOptionsClicked} />} */}
 
-            {!isEvaluation && <Button
-                  id="rate_switch"
-                  fullWidth variant='soft' color={isReAct ? 'success' : 'primary'} 
-                  endDecorator={<RateReviewOutlinedIcon />}
-                  disabled={!props.conversationId || !chatLLM}
-                  onClick={handleRateClicked}
-                >
-                  Rate
-                </Button>
-            }
-
-            {isEvaluation && <Button
-                  id="rate_switch"
-                  fullWidth variant='soft' color={isReAct ? 'success' : 'primary'} 
-                  disabled={!props.conversationId || !chatLLM}
-                  onClick={handleRateClicked}
-                >
-                  Hide Rate
-                </Button>
-            }
             </Box>
 
             <Box sx={{ display: 'flex' }}>
