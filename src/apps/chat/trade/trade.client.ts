@@ -54,6 +54,9 @@ export function createConversationFromJsonV1(part: ExportedConversationJsonV1 & 
     systemPurposeId: part.systemPurposeId || defaultSystemPurposeId,
     ...(part.userTitle && { userTitle: part.userTitle }),
     ...(part.autoTitle && { autoTitle: part.autoTitle }),
+    ...(part.searchTopic && { searchTopic: part.searchTopic }),
+    ...(part.standpoint && { standpoint: part.standpoint as any }),
+    ...(part.strategy && { strategy: part.strategy as any }),
     tokenCount: part.tokenCount || 0,
     created: part.created || Date.now(),
     updated: part.updated || Date.now(),
@@ -147,6 +150,9 @@ type ExportedConversationJsonV1 = {
   systemPurposeId: SystemPurposeId;
   userTitle?: string;
   autoTitle?: string;
+  searchTopic?: string;
+  standpoint?: string;
+  strategy?: string;
   created: number;
   updated: number | null;
 }

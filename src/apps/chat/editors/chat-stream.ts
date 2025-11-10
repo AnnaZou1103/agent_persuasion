@@ -10,6 +10,7 @@ import { DMessage, useChatStore } from '~/common/state/store-chats';
 
 import { createAssistantTypingMessage, updatePurposeInHistory } from './editors';
 import { processUserMessageWithSearch, prepareHistoryWithSearchContext, updateSearchHistory } from '~/modules/pinecone/chat-integration';
+import { useConversationalSearchStore } from '~/modules/pinecone/store-conversational-search';
 
 
 /**
@@ -25,28 +26,53 @@ export async function runAssistantUpdatingState(conversationId: string, history:
   // Try to enhance with conversational search
   let enhancedHistory = history;
   let assistantResponseText = '';
+  let retrievedContext: any[] | undefined;
   
   if (lastUserMessage) {
     try {
       const searchResult = await processUserMessageWithSearch(lastUserMessage, history);
       
       if (searchResult.shouldEnhance && searchResult.enhancedSystemMessage) {
+        // Save user message first (prepareHistoryWithSearchContext doesn't call setMessages)
+        useChatStore.getState().setMessages(conversationId, history);
+        
+        // Save search configuration to conversation (standpoint and strategy)
+        const searchStore = useConversationalSearchStore.getState();
+        if (searchStore.searchState) {
+          useChatStore.getState().setSearchConfig(conversationId, {
+            topic: searchStore.searchState.topic,
+            standpoint: searchStore.searchState.standpoint,
+            strategy: searchStore.searchState.strategy,
+          });
+        }
+        
         // Use enhanced system message with retrieved context
         enhancedHistory = prepareHistoryWithSearchContext(
           history,
           searchResult.enhancedSystemMessage,
           systemPurpose
         );
+        
+        // Store retrieved context for later attachment to assistant message
+        if (searchResult.context && searchResult.context.length > 0) {
+          retrievedContext = searchResult.context.map(snippet => ({
+            content: snippet.content,
+            score: snippet.score,
+            source: snippet.reference?.file?.name,
+            pages: snippet.reference?.pages,
+          }));
+        }
       } else {
-        // Fall back to normal system message update
+        // Fall back to normal system message update (this calls setMessages internally)
         enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
       }
     } catch (error) {
       console.error('Error in conversational search, falling back to normal mode:', error);
+      // updatePurposeInHistory calls setMessages internally
       enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
     }
   } else {
-    // No user message, use normal system message update
+    // No user message, use normal system message update (this calls setMessages internally)
     enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
   }
 
@@ -66,6 +92,11 @@ export async function runAssistantUpdatingState(conversationId: string, history:
       assistantResponseText = updatedMessage.text;
     }
   });
+
+  // Attach retrieved context to the assistant message (if any)
+  if (retrievedContext && retrievedContext.length > 0) {
+    editMessage(conversationId, assistantMessageId, { retrievedContext }, false);
+  }
 
   // Update conversational search history
   if (lastUserMessage && assistantResponseText) {

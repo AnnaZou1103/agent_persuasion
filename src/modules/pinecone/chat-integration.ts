@@ -17,6 +17,7 @@ export async function processUserMessageWithSearch(
   shouldEnhance: boolean;
   enhancedSystemMessage?: string;
   originalSystemMessage?: string;
+  context?: any[];
 }> {
   const searchStore = useConversationalSearchStore.getState();
   
@@ -27,7 +28,7 @@ export async function processUserMessageWithSearch(
 
   try {
     // Perform search and get system prompt with context
-    const { systemPrompt } = await searchStore.performSearch(userMessage);
+    const { systemPrompt, context } = await searchStore.performSearch(userMessage);
     
     // Get original system message from history if exists
     const originalSystemMessage = history.find(msg => msg.role === 'system')?.text;
@@ -36,6 +37,7 @@ export async function processUserMessageWithSearch(
       shouldEnhance: true,
       enhancedSystemMessage: systemPrompt,
       originalSystemMessage,
+      context,
     };
   } catch (error) {
     console.error('Error in conversational search:', error);

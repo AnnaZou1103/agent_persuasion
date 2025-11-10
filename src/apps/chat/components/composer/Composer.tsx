@@ -183,6 +183,25 @@ export function Composer(props: {
     return state.isEvaluationCompleted;
   })
 
+  // Check if conversation has been used (has more than just the initial greeting)
+  const hasConversationActivity = useChatStore(state => {
+    const conversation = state.conversations.find(c => c.id === props.conversationId);
+    if (!conversation) {
+      console.log('[Submit Button] No conversation found for id:', props.conversationId);
+      return false;
+    }
+    // Check if conversation has activity:
+    // - Either has user messages
+    // - Or has more than 1 message (meaning user interacted with it)
+    // - Or has assistant messages (which means user must have sent something)
+    const userMessages = conversation.messages.filter(msg => msg.role === 'user');
+    const assistantMessages = conversation.messages.filter(msg => msg.role === 'assistant' && !msg.typing);
+    const hasActivity = userMessages.length > 0 || assistantMessages.length > 0 || conversation.messages.length > 1;
+    
+    console.log('[Submit Button] Total:', conversation.messages.length, 'User:', userMessages.length, 'Assistant:', assistantMessages.length, 'Has activity:', hasActivity);
+    return hasActivity;
+  })
+
   // Effect: load initial text if queued up (e.g. by /launch)
   React.useEffect(() => {
     if (startupText) {
@@ -708,11 +727,15 @@ export function Composer(props: {
               <Button
                   fullWidth variant='soft' 
                   color={chatLinkResponse?.type === 'success'? 'success' : chatLinkResponse?.type === 'error'? 'danger' : 'primary'}
-                  disabled={!props.conversationId || !chatLLM || !isEvaluationCompleted}
+                  disabled={(() => {
+                    const disabled = !props.conversationId || !chatLLM || !hasConversationActivity;
+                    console.log('[Submit Button] Disabled:', disabled, '| conversationId:', !!props.conversationId, '| chatLLM:', !!chatLLM, '| hasActivity:', hasConversationActivity);
+                    return disabled;
+                  })()}
                   loading={chatLinkUploading}
                   onClick={handleSaveClicked}
                 >
-                {chatLinkResponse?.type === 'success' ? 'Access code: ihopkins' : chatLinkResponse?.type === 'error'? 'Please try again': 'Submit'}
+                {chatLinkResponse?.type === 'success' ? 'Access code: NEU2025' : chatLinkResponse?.type === 'error'? 'Please try again': 'Save'}
               </Button>
 
             </Box>

@@ -40,7 +40,7 @@ export function AppNews() {
           In this task, you will have a conversation with a chatbot to explore information about various topics.
           <ul style={{ marginTop: 8, marginBottom: 8, paddingInlineStart: 24 }}>
               <li>
-                  Ask the chatbot about topics you're interested in learning about.
+                  Ask the chatbot about topics you&apos;re interested in learning about.
               </li>
               <li>The chatbot will provide helpful information to answer your questions.</li>
               <li>You can ask follow-up questions to explore topics in more depth.</li>

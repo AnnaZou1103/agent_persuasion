@@ -3,6 +3,7 @@ import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 
 import { DLLMId, useModelsStore } from '~/modules/llms/store-llms';
+import { Standpoint, ConversationStrategy } from '~/modules/pinecone/pinecone.types';
 
 import { countModelTokens } from '../util/token-counter';
 import { defaultSystemPurposeId, SystemPurposeId, SurveyQuestions, ChatBotType } from '../../data';
@@ -23,6 +24,12 @@ export interface DConversation {
   conversationId?: string;
   userTitle?: string;
   autoTitle?: string;
+  
+  // Conversational search configuration
+  searchTopic?: string;              // Topic for conversational search
+  standpoint?: Standpoint;           // Chatbot's standpoint: 'supporting' or 'opposing'
+  strategy?: ConversationStrategy;   // Conversation strategy: 'suggestion' or 'clarification'
+  
   tokenCount: number;                 // f(messages, llmId)
   created: number;                    // created timestamp
   updated: number | null;             // updated timestamp
@@ -44,68 +51,22 @@ export const initialmessage: DMessage =
   updated: null,
 }
 
-// export const initialmessage: DMessage = 
-// {id: uuidv4(),
-//   text:"Welcome to our job interview simulation! I'll be asking you a series of questions to assess key behaviors that are important in the workplace. Let's get started—can you describe a situation where you went beyond the expected to complete a task?",
-//   sender: 'Bot',
-//   avatar: null,
-//   typing: false,
-//   role: 'assistant',
-//   isRated: false,
-//   purposeId: defaultSystemPurposeId,
-//   tokenCount: 0,
-//   created: Date.now(),
-//   updated: null,
-// }
 
-// export const initialmessage: DMessage = 
-// {id: uuidv4(),
-//   text:"Welcom to our chatbot! As we tackle your workday's challenges, I'm here to support you. What's the first workday issue we should address together?",
-//   sender: 'Bot',
-//   avatar: null,
-//   typing: false,
-//   role: 'assistant',
-//   isRated: false,
-//   purposeId: defaultSystemPurposeId,
-//   tokenCount: 0,
-//   created: Date.now(),
-//   updated: null,
-// }
-
-// export const initialmessage: DMessage = 
-// {id: uuidv4(),
-//   text:"Welcome to our travel planning task! To get started, please specify your desired destination(s), travel dates, and share your interests and expectations for the trip.",
-//   sender: 'Bot',
-//   avatar: null,
-//   typing: false,
-//   role: 'assistant',
-//   isRated: false,
-//   purposeId: defaultSystemPurposeId,
-//   tokenCount: 0,
-//   created: Date.now(),
-//   updated: null,
-// }
-
-// export const initialmessage: DMessage = 
-// {id: uuidv4(),
-//   text:"Welcome to our learning task! Feel free to express the specific areas of the concept that you find challenging or unclear. What concept would you like me to explain？",
-//   sender: 'Bot',
-//   avatar: null,
-//   typing: false,
-//   role: 'assistant',
-//   isRated: false,
-//   purposeId: defaultSystemPurposeId,
-//   tokenCount: 0,
-//   created: Date.now(),
-//   updated: null,
-// }
-
-
-export function createDConversation(systemPurposeId?: SystemPurposeId): DConversation {
+export function createDConversation(
+  systemPurposeId?: SystemPurposeId,
+  searchConfig?: {
+    topic?: string;
+    standpoint?: Standpoint;
+    strategy?: ConversationStrategy;
+  }
+): DConversation {
   return {
     id: uuidv4(),
     messages: [],
     systemPurposeId: systemPurposeId || defaultSystemPurposeId,
+    ...(searchConfig?.topic && { searchTopic: searchConfig.topic }),
+    ...(searchConfig?.standpoint && { standpoint: searchConfig.standpoint }),
+    ...(searchConfig?.strategy && { strategy: searchConfig.strategy }),
     tokenCount: 0,
     created: Date.now(),
     updated: Date.now(),
@@ -114,12 +75,23 @@ export function createDConversation(systemPurposeId?: SystemPurposeId): DConvers
   };
 }
 
-export function createDEvaluation(conversationId: string, systemPurposeId?: SystemPurposeId): DConversation {
+export function createDEvaluation(
+  conversationId: string, 
+  systemPurposeId?: SystemPurposeId,
+  searchConfig?: {
+    topic?: string;
+    standpoint?: Standpoint;
+    strategy?: ConversationStrategy;
+  }
+): DConversation {
   return {
     id: uuidv4(),
     messages: [SurveyQuestions[0], SurveyQuestions[1]],
     systemPurposeId: systemPurposeId || defaultSystemPurposeId,
     conversationId: conversationId,
+    ...(searchConfig?.topic && { searchTopic: searchConfig.topic }),
+    ...(searchConfig?.standpoint && { standpoint: searchConfig.standpoint }),
+    ...(searchConfig?.strategy && { strategy: searchConfig.strategy }),
     tokenCount: 0,
     created: Date.now(),
     updated: Date.now(),
@@ -151,6 +123,14 @@ export interface DMessage {
   originLLM?: string;               // only assistant - model that generated this message, goes beyond known models
   choices?: string[];
   selected?: string;
+
+  // Retrieved context snippets from Pinecone (only for assistant messages with search enabled)
+  retrievedContext?: Array<{
+    content: string;              // snippet content
+    score: number;                // relevance score
+    source?: string;              // file name
+    pages?: number[];             // page numbers if applicable
+  }>;
 
   tokenCount: number;               // cache for token count, using the current Conversation model (0 = not yet calculated)
 
@@ -224,6 +204,7 @@ interface ChatActions {
   setSystemPurposeId: (conversationId: string, systemPurposeId: SystemPurposeId) => void;
   setAutoTitle: (conversationId: string, autoTitle: string) => void;
   setUserTitle: (conversationId: string, userTitle: string) => void;
+  setSearchConfig: (conversationId: string, config: { topic?: string; standpoint?: Standpoint; strategy?: ConversationStrategy }) => void;
   getPairedQuestionId: (conversationId: string, messageId: string) => string;
   isConversation: (conversation: DConversation)=>boolean;
   setPairedEvaluationId:(conversationId: string, evaluationId: string)=>void;
@@ -542,6 +523,14 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
         get()._editConversation(conversationId,
           {
             userTitle,
+          }),
+
+      setSearchConfig: (conversationId: string, config: { topic?: string; standpoint?: Standpoint; strategy?: ConversationStrategy }) =>
+        get()._editConversation(conversationId,
+          {
+            ...(config.topic !== undefined && { searchTopic: config.topic }),
+            ...(config.standpoint !== undefined && { standpoint: config.standpoint }),
+            ...(config.strategy !== undefined && { strategy: config.strategy }),
           }),
 
       appendEphemeral: (conversationId: string, ephemeral: DEphemeral) =>
