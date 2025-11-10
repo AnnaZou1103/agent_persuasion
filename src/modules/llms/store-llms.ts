@@ -216,7 +216,7 @@ function findLlmIdBySuffix(llms: DLLM[], suffixes: string[], fallbackToFirst: bo
   return fallbackToFirst ? llms[0].id : null;
 }
 
-function updateSelectedIds(allLlms: DLLM[], chatLlmId: DLLMId | null, fastLlmId: DLLMId | null, funcLlmId: DLLMId | null): Partial<ModelsData> {
+function updateSelectedIds(allLlms: DLLM[], chatLlmId: DLLMId | null, fastLlmId: DLLMId | null, funcLlmId: DLLMId | null): { chatLLMId: DLLMId | null; fastLLMId: DLLMId | null; funcLLMId: DLLMId | null } {
   if (chatLlmId && !allLlms.find(llm => llm.id === chatLlmId)) chatLlmId = null;
   if (!chatLlmId) chatLlmId = findLlmIdBySuffix(allLlms, defaultChatSuffixPreference, true);
 
