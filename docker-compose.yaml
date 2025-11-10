@@ -2,7 +2,24 @@ version: '3.9'
 
 services:
   big-agi:
-    image: ghcr.io/enricoros/big-agi:main
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Pass environment variables as build arguments
+        - OPENAI_API_KEY=${OPENAI_API_KEY}
+        - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+        - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+        - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+        - AZURE_OPENAI_API_ENDPOINT=${AZURE_OPENAI_API_ENDPOINT}
+        - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+        - PRODIA_API_KEY=${PRODIA_API_KEY}
+        - GOOGLE_CLOUD_API_KEY=${GOOGLE_CLOUD_API_KEY}
+        - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
+        - MONGODB_PRISMA_URL=${MONGODB_PRISMA_URL}
+        - MONGODB_URL_NON_POOLING=${MONGODB_URL_NON_POOLING}
+        - PINECONE_API_KEY=${PINECONE_API_KEY}
+        - PINECONE_ASSISTANT_NAME=${PINECONE_ASSISTANT_NAME}
     ports:
       - "3000:3000"
     env_file:
