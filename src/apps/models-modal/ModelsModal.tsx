@@ -36,11 +36,11 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
   const multiSource = modelSources.length > 1;
 
-  // if no sources at startup, open the modal
-  React.useEffect(() => {
-    if (!selectedSourceId && !props.suspendAutoModelsSetup)
-      openModelsSetup();
-  }, [selectedSourceId, openModelsSetup, props.suspendAutoModelsSetup]);
+  // if no sources at startup, open the modal (disabled - auto-init instead)
+  // React.useEffect(() => {
+  //   if (!selectedSourceId && !props.suspendAutoModelsSetup)
+  //     openModelsSetup();
+  // }, [selectedSourceId, openModelsSetup, props.suspendAutoModelsSetup]);
 
   // add the default source on cold - will require setup
   React.useEffect(() => {
@@ -52,7 +52,12 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
   return <>
 
-    {/* Sources Setup */}
+    {/* VendorSourceSetup must be rendered to trigger model fetching */}
+    {!!activeSource && <div style={{ display: 'none' }}>
+      <VendorSourceSetup source={activeSource} />
+    </div>}
+
+    {/* Sources Setup UI - commented out but initialization still works */}
     {/* {modelsSetupOpen && <GoodModal
       title={<>Configure <b>AI Models</b></>}
       startButton={
@@ -66,10 +71,10 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
       <ModelsSourceSelector selectedSourceId={selectedSourceId} setSelectedSourceId={setSelectedSourceId} />
 
-      {!!activeSource && <Divider />} */}
+      {!!activeSource && <Divider />}
 
       {!!activeSource && <VendorSourceSetup source={activeSource} />}
-{/* 
+
       {!!llmCount && <Divider />}
 
       {!!llmCount && <ModelsList filterSourceId={showAllSources ? null : selectedSourceId} />}
