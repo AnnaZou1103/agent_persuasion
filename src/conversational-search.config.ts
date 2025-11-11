@@ -18,9 +18,9 @@ export const CONVERSATIONAL_SEARCH_DEFAULTS = {
   /** default topic - set for experiment since UI is hidden */
   defaultTopic: 'Should Cell Phones Be Banned in Schools?',
   
-  defaultStandpoint: 'supporting' as Standpoint,
+  defaultStandpoint: 'opposing' as Standpoint,
   
-  defaultStrategy: 'suggestion' as ConversationStrategy,
+  defaultStrategy: 'clarification' as ConversationStrategy,
   
   // ============================================
   // retrieval defaults
@@ -253,8 +253,6 @@ Your role:
 - Ask clarifying questions when user intent is unclear
 - Offer helpful suggestions and insights
 - Maintain a conversational and approachable tone
-
-Current date: {{Today}}
 
 Guidelines:
 - Be respectful and considerate in all interactions

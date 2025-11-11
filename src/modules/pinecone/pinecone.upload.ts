@@ -80,23 +80,26 @@ export interface BatchUploadResult {
 export async function uploadFile(
   options: UploadOptions
 ): Promise<UploadResponse> {
-  if (!isPineconeEnabled()) {
-    throw new Error('Pinecone is not enabled. Please configure PINECONE_API_KEY and PINECONE_ASSISTANT_NAME.');
-  }
-
   const { file, fileName, metadata = {} } = options;
 
   try {
+    // WORKAROUND: Since Pinecone REST API doesn't support metadata,
+    // encode stance in filename as [stance]original-name.ext
+    let uploadFileName = fileName;
+    if (metadata.stance) {
+      uploadFileName = `[${metadata.stance}]${fileName}`;
+    }
+    
     // Create form data
     const formData = new FormData();
-    formData.append('file', file, fileName);
+    formData.append('file', file, uploadFileName);
     
-    // Add metadata as JSON string
+    // Still include metadata for potential future support
     if (Object.keys(metadata).length > 0) {
       formData.append('metadata', JSON.stringify(metadata));
     }
 
-    // Upload to Pinecone Assistant
+    // Upload via REST API (SDK doesn't support Assistant API in v4)
     const response = await fetch(
       `https://prod-1-data.ke.pinecone.io/assistant/files/${PINECONE_CONFIG.assistantName}`,
       {
@@ -105,7 +108,6 @@ export async function uploadFile(
           'Api-Key': PINECONE_CONFIG.apiKey,
           'accept': 'application/json',
           'X-Pinecone-API-Version': '2025-04',
-          // Note: Don't set Content-Type header, browser will set it automatically with boundary for multipart/form-data
         },
         body: formData,
       }

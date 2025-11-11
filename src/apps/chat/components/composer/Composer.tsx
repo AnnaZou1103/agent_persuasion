@@ -486,14 +486,19 @@ export function Composer(props: {
       
       // Check how many messages have retrieved context
       const messagesWithContext = chatV1.messages.filter(msg => msg.retrievedContext && msg.retrievedContext.length > 0);
+      const messagesWithResults = messagesWithContext.filter(msg => !msg.retrievedContext?.[0]?.isNoResultMarker);
+      const messagesWithNoResults = messagesWithContext.filter(msg => msg.retrievedContext?.[0]?.isNoResultMarker);
+      
       console.log('[Save] Saving to MongoDB:', {
         conversationId,
         searchTopic: chatV1.searchTopic,
         standpoint: chatV1.standpoint,
         strategy: chatV1.strategy,
         messageCount: chatV1.messages.length,
-        messagesWithContext: messagesWithContext.length,
-        contextDetails: messagesWithContext.map(msg => ({
+        messagesSearched: messagesWithContext.length,
+        messagesWithResults: messagesWithResults.length,
+        messagesWithNoResults: messagesWithNoResults.length,
+        contextDetails: messagesWithResults.map(msg => ({
           messageId: msg.id,
           contextCount: msg.retrievedContext?.length || 0,
           sources: msg.retrievedContext?.map(c => c.source).filter(Boolean) || [],

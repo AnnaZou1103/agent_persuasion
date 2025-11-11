@@ -67,9 +67,9 @@ export default async function handler(
 
     // Read file content
     const fileBuffer = await fs.promises.readFile(uploadedFile.filepath);
-    const blob = new Blob([fileBuffer], { type: uploadedFile.mimetype || 'application/octet-stream' });
+    const blob = new Blob([new Uint8Array(fileBuffer)], { type: uploadedFile.mimetype || 'application/octet-stream' });
 
-    // Upload to Pinecone
+    // Upload to Pinecone (with stance encoded in filename)
     const result = await uploadFile({
       file: blob,
       fileName: uploadedFile.originalFilename || 'unnamed-file',

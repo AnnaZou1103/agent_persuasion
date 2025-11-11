@@ -71,6 +71,14 @@ export async function runAssistantUpdatingState(conversationId: string, history:
             source: snippet.reference?.file?.name,
             pages: snippet.reference?.pages,
           }));
+        } else {
+          // Mark as "search performed but no results found"
+          console.log('[Search] No context found for query:', lastUserMessage);
+          retrievedContext = [{
+            content: 'SEARCH_NO_RESULTS',
+            score: 0,
+            isNoResultMarker: true,
+          }];
         }
       } else {
         // Fall back to normal system message update
@@ -101,14 +109,16 @@ export async function runAssistantUpdatingState(conversationId: string, history:
 
   // Attach retrieved context to the assistant message (if any)
   if (retrievedContext && retrievedContext.length > 0) {
+    const isNoResult = retrievedContext[0]?.isNoResultMarker;
     console.log('[Context Storage] Attaching context to message:', {
       messageId: assistantMessageId,
-      contextCount: retrievedContext.length,
-      contexts: retrievedContext.map(c => ({ source: c.source, score: c.score })),
+      status: isNoResult ? 'SEARCH_NO_RESULTS' : 'SUCCESS',
+      contextCount: isNoResult ? 0 : retrievedContext.length,
+      contexts: isNoResult ? [] : retrievedContext.map(c => ({ source: c.source, score: c.score })),
     });
     editMessage(conversationId, assistantMessageId, { retrievedContext }, false);
   } else {
-    console.log('[Context Storage] No context to attach');
+    console.log('[Context Storage] No context - search not performed or error occurred');
   }
 
   // Update conversational search history

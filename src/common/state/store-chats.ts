@@ -120,11 +120,16 @@ export interface DMessage {
   selected?: string;
 
   // Retrieved context snippets from Pinecone (only for assistant messages with search enabled)
+  // Can be:
+  // - Array of context objects: search successful with results
+  // - Array with special marker: search successful but no results found
+  // - undefined: search not performed or error occurred
   retrievedContext?: Array<{
     content: string;              // snippet content
     score: number;                // relevance score
     source?: string;              // file name
     pages?: number[];             // page numbers if applicable
+    isNoResultMarker?: boolean;   // true if this is a "no results found" marker
   }>;
 
   tokenCount: number;               // cache for token count, using the current Conversation model (0 = not yet calculated)

@@ -59,24 +59,37 @@ export async function retrieveContext(
 }
 
 /**
- * Filter snippets based on standpoint using document metadata
- * Expected metadata format: { stance: 'supporting' | 'opposing' }
- * Documents without stance metadata are kept (treated as neutral)
+ * Filter snippets based on standpoint
+ * 
+ * WORKAROUND: Since Pinecone REST API doesn't support metadata,
+ * we encode stance in filename as [stance]original-name.ext
+ * 
+ * This function tries both methods:
+ * 1. Check metadata.stance (for future compatibility)
+ * 2. Parse stance from filename pattern [supporting] or [opposing]
  */
 export function filterSnippetsByStandpoint(
   snippets: PineconeSnippet[],
   standpoint: 'supporting' | 'opposing'
 ): PineconeSnippet[] {
   return snippets.filter(snippet => {
+    // Method 1: Check metadata (for future compatibility)
     const metadata = snippet.reference?.file?.metadata;
-    
-    // If no metadata or no stance field, keep the snippet (neutral document)
-    if (!metadata || !metadata.stance) {
-      return true;
+    if (metadata?.stance) {
+      return metadata.stance === standpoint;
     }
     
-    // If document has stance metadata, only keep matching documents
-    return metadata.stance === standpoint;
+    // Method 2: Parse stance from filename
+    const fileName = snippet.reference?.file?.name;
+    if (fileName) {
+      const stanceMatch = fileName.match(/^\[(supporting|opposing)\]/);
+      if (stanceMatch) {
+        return stanceMatch[1] === standpoint;
+      }
+    }
+    
+    // If no stance info found in metadata or filename, filter out
+    return false;
   });
 }
 
