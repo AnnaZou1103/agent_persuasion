@@ -126,7 +126,7 @@ export function conversationToMarkdown(conversation: DConversation, hideSystemMe
         text = '<img src="https://i.giphy.com/media/jJxaUysjzO9ri/giphy.webp" width="48" height="48" alt="typing fast meme"/>\n\n' + '*' + text + '*';
         break;
       case 'assistant':
-        const purpose = message.purposeId || conversation.systemPurposeId || null;
+        const purpose = message.purposeId || null;
         sender = `${purpose || 'Assistant'} · *${prettyBaseModel(message.originLLM || '')}*`.trim();
         if (purpose && purpose in SystemPurposes)
           sender = `${SystemPurposes[purpose]?.symbol || ''} ${sender}`.trim();

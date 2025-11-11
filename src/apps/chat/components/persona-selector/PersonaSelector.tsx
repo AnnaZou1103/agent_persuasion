@@ -232,7 +232,7 @@ export function PersonaSelector(props: { conversationId: string, runExample: (ex
             )}
         </Typography>
 
-        {systemPurposeId === 'Custom' && (
+        {false && (  // Custom persona not available with conv_search
           <Textarea
             variant='outlined' autoFocus placeholder={'Craft your custom system message here…'}
             minRows={3}
