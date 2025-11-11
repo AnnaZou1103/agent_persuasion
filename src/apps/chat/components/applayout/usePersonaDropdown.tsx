@@ -53,27 +53,17 @@ function AppBarPersonaDropdown(props: {
 
 export function usePersonaIdDropdown(conversationId: string | null) {
 
-  // external state
-  const { systemPurposeId } = useChatStore(state => {
-    const conversation = state.conversations.find(conversation => conversation.id === conversationId);
-    return {
-      systemPurposeId: conversation?.systemPurposeId ?? null,
-    };
-  }, shallow);
+  // Simplified: Always use 'conv_search' persona
+  const systemPurposeId: SystemPurposeId = 'conv_search';
 
-  const personaDropdown = React.useMemo(() => systemPurposeId
+  const personaDropdown = React.useMemo(() => conversationId
       ? <AppBarPersonaDropdown
         systemPurposeId={systemPurposeId}
-        setSystemPurposeId={(systemPurposeId) => {
-          if (conversationId && systemPurposeId)
-            useChatStore.getState().setSystemPurposeId(conversationId, systemPurposeId);
+        setSystemPurposeId={() => {
+          // No-op: only one persona available
         }}
-        // onCall={() => {
-        //   if (conversationId && systemPurposeId)
-        //     launchAppCall(conversationId, systemPurposeId);
-        //}}
       /> : null,
-    [conversationId, systemPurposeId],
+    [conversationId],
   );
 
   return { personaDropdown };

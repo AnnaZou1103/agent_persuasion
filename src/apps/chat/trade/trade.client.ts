@@ -51,7 +51,6 @@ export function createConversationFromJsonV1(part: ExportedConversationJsonV1 & 
   const restored: DConversation = {
     id: part.id,
     messages: part.messages,
-    systemPurposeId: part.systemPurposeId || defaultSystemPurposeId,
     ...(part.userTitle && { userTitle: part.userTitle }),
     ...(part.autoTitle && { autoTitle: part.autoTitle }),
     ...(part.searchTopic && { searchTopic: part.searchTopic }),
@@ -147,7 +146,6 @@ export function conversationToMarkdown(conversation: DConversation, hideSystemMe
 type ExportedConversationJsonV1 = {
   id: string;
   messages: DMessage[];
-  systemPurposeId: SystemPurposeId;
   userTitle?: string;
   autoTitle?: string;
   searchTopic?: string;

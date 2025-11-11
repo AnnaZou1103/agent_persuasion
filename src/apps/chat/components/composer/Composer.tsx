@@ -165,11 +165,10 @@ export function Composer(props: {
     experimentalLabs: state.experimentalLabs,
   }), shallow);
   const { startupText, setStartupText } = useComposerStore();
-  const { assistantTyping, systemPurposeId, tokenCount: conversationTokenCount, stopTyping } = useChatStore(state => {
+  const { assistantTyping, tokenCount: conversationTokenCount, stopTyping } = useChatStore(state => {
     const conversation = state.conversations.find(conversation => conversation.id === props.conversationId);
     return {
       assistantTyping: conversation ? !!conversation.abortController : false,
-      systemPurposeId: conversation?.systemPurposeId ?? null,
       tokenCount: conversation ? conversation.tokenCount : 0,
       stopTyping: state.stopTyping,
     };
@@ -191,15 +190,12 @@ export function Composer(props: {
       console.log('[Submit Button] No conversation found for id:', props.conversationId);
       return false;
     }
-    // Check if conversation has activity:
-    // - Either has user messages
-    // - Or has more than 1 message (meaning user interacted with it)
-    // - Or has assistant messages (which means user must have sent something)
+    // A conversation has activity ONLY if the user has sent at least one message
+    // Initial bot greeting message should NOT count as activity
     const userMessages = conversation.messages.filter(msg => msg.role === 'user');
-    const assistantMessages = conversation.messages.filter(msg => msg.role === 'assistant' && !msg.typing);
-    const hasActivity = userMessages.length > 0 || assistantMessages.length > 0 || conversation.messages.length > 1;
+    const hasActivity = userMessages.length > 0;
     
-    console.log('[Submit Button] Total:', conversation.messages.length, 'User:', userMessages.length, 'Assistant:', assistantMessages.length, 'Has activity:', hasActivity);
+    console.log('[Submit Button] Total:', conversation.messages.length, 'User:', userMessages.length, 'Has activity:', hasActivity);
     return hasActivity;
   })
 
@@ -210,6 +206,13 @@ export function Composer(props: {
       setComposeText(startupText);
     }
   }, [startupText, setStartupText]);
+
+  // Effect: reset chatLinkResponse when conversation changes (to ensure Save button shows "Save" for new conversations)
+  React.useEffect(() => {
+    console.log('[Save Button Reset] Conversation changed to:', props.conversationId);
+    setChatLinkResponse(null);
+    setChatLinkUploading(false);
+  }, [props.conversationId]);
 
   // derived state
   const tokenLimit = chatLLM?.contextTokens || 0;
@@ -233,7 +236,7 @@ export function Composer(props: {
   };
 
 
-  const handleCallClicked = () => props.conversationId && systemPurposeId && launchAppCall(props.conversationId, systemPurposeId);
+  const handleCallClicked = () => props.conversationId && launchAppCall(props.conversationId, 'conv_search');
 
   const handleDrawOptionsClicked = () => useUIStateStore.getState().openSettings(2);
 
@@ -480,12 +483,21 @@ export function Composer(props: {
       if (!latestConversation) return;
       
       const chatV1 = conversationToJsonV1(latestConversation);
+      
+      // Check how many messages have retrieved context
+      const messagesWithContext = chatV1.messages.filter(msg => msg.retrievedContext && msg.retrievedContext.length > 0);
       console.log('[Save] Saving to MongoDB:', {
         conversationId,
         searchTopic: chatV1.searchTopic,
         standpoint: chatV1.standpoint,
         strategy: chatV1.strategy,
         messageCount: chatV1.messages.length,
+        messagesWithContext: messagesWithContext.length,
+        contextDetails: messagesWithContext.map(msg => ({
+          messageId: msg.id,
+          contextCount: msg.retrievedContext?.length || 0,
+          sources: msg.retrievedContext?.map(c => c.source).filter(Boolean) || [],
+        })),
       });
       const chatTitle = conversationTitle(latestConversation) || undefined;
       const response: StoragePutSchema = await apiAsyncNode.trade.storagePut.mutate({
@@ -765,11 +777,7 @@ export function Composer(props: {
               <Button
                   fullWidth variant='soft' 
                   color={chatLinkResponse?.type === 'success'? 'success' : chatLinkResponse?.type === 'error'? 'danger' : 'primary'}
-                  disabled={(() => {
-                    const disabled = !props.conversationId || !chatLLM || !hasConversationActivity;
-                    console.log('[Submit Button] Disabled:', disabled, '| conversationId:', !!props.conversationId, '| chatLLM:', !!chatLLM, '| hasActivity:', hasConversationActivity);
-                    return disabled;
-                  })()}
+                  disabled={!props.conversationId || !chatLLM || !hasConversationActivity}
                   loading={chatLinkUploading}
                   onClick={handleSaveClicked}
                 >

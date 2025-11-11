@@ -16,7 +16,7 @@ import { useConversationalSearchStore } from '~/modules/pinecone/store-conversat
 /**
  * The main "chat" function. TODO: this is here so we can soon move it to the data model.
  */
-export async function runAssistantUpdatingState(conversationId: string, history: DMessage[], assistantLlmId: DLLMId, systemPurpose: SystemPurposeId, _autoTitle: boolean, enableFollowUps: boolean) {
+export async function runAssistantUpdatingState(conversationId: string, history: DMessage[], assistantLlmId: DLLMId, _autoTitle: boolean, enableFollowUps: boolean) {
 
   // Get the last user message for search
   const lastUserMessage = history.length > 0 && history[history.length - 1].role === 'user' 
@@ -25,7 +25,7 @@ export async function runAssistantUpdatingState(conversationId: string, history:
 
   // Create a blank and 'typing' message for the assistant IMMEDIATELY
   // This gives instant feedback to the user while search happens in background
-  const assistantMessageId = createAssistantTypingMessage(conversationId, assistantLlmId, systemPurpose, 'Searching...');
+  const assistantMessageId = createAssistantTypingMessage(conversationId, assistantLlmId, undefined, 'Searching...');
 
   // When an abort controller is set, the UI switches to the "stop" mode
   const controller = new AbortController();
@@ -42,11 +42,25 @@ export async function runAssistantUpdatingState(conversationId: string, history:
       const searchResult = await processUserMessageWithSearch(lastUserMessage, history);
       
       if (searchResult.shouldEnhance && searchResult.enhancedSystemMessage) {
+        // Save search configuration to conversation for MongoDB storage
+        const searchStore = useConversationalSearchStore.getState();
+        if (searchStore.searchState) {
+          useChatStore.getState().setSearchConfig(conversationId, {
+            topic: searchStore.searchState.topic,
+            standpoint: searchStore.searchState.standpoint,
+            strategy: searchStore.searchState.strategy,
+          });
+          console.log('[Search Config] Saved to conversation:', {
+            topic: searchStore.searchState.topic,
+            standpoint: searchStore.searchState.standpoint,
+            strategy: searchStore.searchState.strategy,
+          });
+        }
+        
         // Use enhanced system message with retrieved context
         enhancedHistory = prepareHistoryWithSearchContext(
           history,
-          searchResult.enhancedSystemMessage,
-          systemPurpose
+          searchResult.enhancedSystemMessage
         );
         
         // Store retrieved context for later attachment to assistant message
@@ -60,15 +74,15 @@ export async function runAssistantUpdatingState(conversationId: string, history:
         }
       } else {
         // Fall back to normal system message update
-        enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
+        enhancedHistory = updatePurposeInHistory(conversationId, history);
       }
     } catch (error) {
       console.error('Error in conversational search, falling back to normal mode:', error);
-      enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
+      enhancedHistory = updatePurposeInHistory(conversationId, history);
     }
   } else {
     // No user message, use normal system message update
-    enhancedHistory = updatePurposeInHistory(conversationId, history, systemPurpose);
+    enhancedHistory = updatePurposeInHistory(conversationId, history);
   }
 
   // Update the assistant message purpose after search is complete
@@ -87,7 +101,14 @@ export async function runAssistantUpdatingState(conversationId: string, history:
 
   // Attach retrieved context to the assistant message (if any)
   if (retrievedContext && retrievedContext.length > 0) {
+    console.log('[Context Storage] Attaching context to message:', {
+      messageId: assistantMessageId,
+      contextCount: retrievedContext.length,
+      contexts: retrievedContext.map(c => ({ source: c.source, score: c.score })),
+    });
     editMessage(conversationId, assistantMessageId, { retrievedContext }, false);
+  } else {
+    console.log('[Context Storage] No context to attach');
   }
 
   // Update conversational search history

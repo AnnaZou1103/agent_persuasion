@@ -40,7 +40,7 @@ export function AppChat() {
   const [flattenConversationId, setFlattenConversationId] = React.useState<string | null>(null);
 
   // external state
-  const { activeConversationId, activeEvaluationId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, systemPurposeId, setAutoTitle, setActiveEvaluationId } = useChatStore(state => {
+  const { activeConversationId, activeEvaluationId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId } = useChatStore(state => {
     const conversation = state.conversations.find(conversation => conversation.id === state.activeConversationId);
     const isConversationEmpty = conversation ? !conversation.messages.length : true;
     const hasAnyContent = state.conversations.length > 1 || !isConversationEmpty;
@@ -52,7 +52,6 @@ export function AppChat() {
       duplicateConversation: state.duplicateConversation,
       deleteAllConversations: state.deleteAllConversations,
       setMessages: state.setMessages,
-      systemPurposeId: conversation?.systemPurposeId ?? null,
       setAutoTitle: state.setAutoTitle,
       setActiveEvaluationId: state.setActiveEvaluationId,
     };
@@ -88,11 +87,11 @@ export function AppChat() {
     }
     
     // synchronous long-duration tasks, which update the state as they go
-    if (chatModeId && chatLLMId && systemPurposeId) {
+    if (chatModeId && chatLLMId) {
       switch (chatModeId) {
         case 'immediate':
         case 'immediate-follow-up':
-          return await runAssistantUpdatingState(conversationId, history, chatLLMId, systemPurposeId, true, chatModeId === 'immediate-follow-up');
+          return await runAssistantUpdatingState(conversationId, history, chatLLMId, true, chatModeId === 'immediate-follow-up');
         case 'write-user':
           return setMessages(conversationId, history);
         case 'react':

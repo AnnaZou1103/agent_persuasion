@@ -19,7 +19,6 @@ import { IDB_MIGRATION_INITIAL, idbStateStorage } from '../util/idbUtils';
 export interface DConversation {
   id: string;
   messages: DMessage[];
-  systemPurposeId: SystemPurposeId;
   evaluationId?:string;
   conversationId?: string;
   userTitle?: string;
@@ -45,7 +44,7 @@ export const initialmessage: DMessage =
   avatar: null,
   typing: false,
   role: 'assistant',
-  purposeId: 'suggestion',
+  purposeId: defaultSystemPurposeId,
   tokenCount: 0,
   created: Date.now(),
   updated: null,
@@ -53,7 +52,6 @@ export const initialmessage: DMessage =
 
 
 export function createDConversation(
-  systemPurposeId?: SystemPurposeId,
   searchConfig?: {
     topic?: string;
     standpoint?: Standpoint;
@@ -63,7 +61,6 @@ export function createDConversation(
   return {
     id: uuidv4(),
     messages: [],
-    systemPurposeId: systemPurposeId || defaultSystemPurposeId,
     ...(searchConfig?.topic && { searchTopic: searchConfig.topic }),
     ...(searchConfig?.standpoint && { standpoint: searchConfig.standpoint }),
     ...(searchConfig?.strategy && { strategy: searchConfig.strategy }),
@@ -76,8 +73,7 @@ export function createDConversation(
 }
 
 export function createDEvaluation(
-  conversationId: string, 
-  systemPurposeId?: SystemPurposeId,
+  conversationId: string,
   searchConfig?: {
     topic?: string;
     standpoint?: Standpoint;
@@ -87,7 +83,6 @@ export function createDEvaluation(
   return {
     id: uuidv4(),
     messages: [SurveyQuestions[0], SurveyQuestions[1]],
-    systemPurposeId: systemPurposeId || defaultSystemPurposeId,
     conversationId: conversationId,
     ...(searchConfig?.topic && { searchTopic: searchConfig.topic }),
     ...(searchConfig?.standpoint && { standpoint: searchConfig.standpoint }),
@@ -100,7 +95,7 @@ export function createDEvaluation(
   };
 }
 
-const defaultConversations: DConversation[] = [createDConversation(ChatBotType[Math.floor(Math.random() * ChatBotType.length)])];
+const defaultConversations: DConversation[] = [createDConversation()];
 
 /**
  * Message, sent or received, by humans or bots
@@ -201,7 +196,6 @@ interface ChatActions {
   appendMessage: (conversationId: string, message: DMessage) => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
   editMessage: (conversationId: string, messageId: string, updatedMessage: Partial<DMessage>, touch: boolean) => void;
-  setSystemPurposeId: (conversationId: string, systemPurposeId: SystemPurposeId) => void;
   setAutoTitle: (conversationId: string, autoTitle: string) => void;
   setUserTitle: (conversationId: string, userTitle: string) => void;
   setSearchConfig: (conversationId: string, config: { topic?: string; standpoint?: Standpoint; strategy?: ConversationStrategy }) => void;
@@ -235,7 +229,7 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
         set(state => {
           // inherit some values from the active conversation (matches users' expectations)
           // const activeConversation = state.conversations.find((conversation: DConversation): boolean => conversation.id === state.activeConversationId);
-          const conversation = createDConversation(ChatBotType[Math.floor(Math.random() * ChatBotType.length)]);
+          const conversation = createDConversation();
 
           return {
             conversations: [
@@ -253,7 +247,7 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
           // inherit some values from the active conversation (matches users' expectations)
           const activeConversation = state.conversations.find((conversation: DConversation): boolean => conversation.id === state.activeConversationId);
           if (activeConversation){
-            const evaluation = createDEvaluation(activeConversation.id,activeConversation.systemPurposeId);
+            const evaluation = createDEvaluation(activeConversation.id);
             state.setPairedEvaluationId(activeConversation.id, evaluation.id);
             return {
               conversations: [
@@ -362,7 +356,7 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
         set(state => {
           // inherit some values from the active conversation (matches users' expectations)
           // const activeConversation = state.conversations.find((conversation: DConversation): boolean => conversation.id === state.activeConversationId);
-          const conversation = createDConversation(ChatBotType[Math.floor(Math.random() * ChatBotType.length)]);
+          const conversation = createDConversation();
           // const evaluation = createEvaluation(conversation.id,conversation.systemPurposeId);
 
           // abort any pending requests on all conversations
@@ -506,12 +500,6 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
             ...(setUpdated && { updated: Date.now() }),
           };
         }),
-
-      setSystemPurposeId: (conversationId: string, systemPurposeId: SystemPurposeId) =>
-        get()._editConversation(conversationId,
-          {
-            systemPurposeId,
-          }),
 
       setAutoTitle: (conversationId: string, autoTitle: string) =>
         get()._editConversation(conversationId,

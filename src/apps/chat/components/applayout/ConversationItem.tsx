@@ -35,7 +35,6 @@ export function ConversationItem(props: {
       isNew: conversation.messages.length === 0,
       messageCount: conversation.messages.length,
       assistantTyping: !!conversation.abortController,
-      systemPurposeId: conversation.systemPurposeId,
       title: conversationTitle(conversation, 'new conversation'),
       setUserTitle: state.setUserTitle,
     };
@@ -51,7 +50,7 @@ export function ConversationItem(props: {
 
   // sanity check: shouldn't happen, but just in case
   if (!cState) return null;
-  const { isNew, messageCount, assistantTyping, setUserTitle, systemPurposeId, title } = cState;
+  const { isNew, messageCount, assistantTyping, setUserTitle, title } = cState;
 
   const handleActivate = () => props.conversationActivate(props.conversationId, true);
 
@@ -80,7 +79,7 @@ export function ConversationItem(props: {
 
   const handleDeleteCancel = () => setDeleteArmed(false);
 
-  const textSymbol = SystemPurposes[systemPurposeId]?.symbol || '❓';
+  const textSymbol = SystemPurposes['conv_search']?.symbol || '💬';
   const buttonSx: SxProps = { ml: 1, ...(props.isActive ? { color: 'white' } : {}) };
 
   const progress = props.maxChatMessages ? 100 * messageCount / props.maxChatMessages : 0;

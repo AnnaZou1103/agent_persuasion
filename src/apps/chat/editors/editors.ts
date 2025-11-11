@@ -14,18 +14,16 @@ export function createAssistantTypingMessage(conversationId: string, assistantLl
 }
 
 
-export function updatePurposeInHistory(conversationId: string, history: DMessage[], purposeId: SystemPurposeId): DMessage[] {
+export function updatePurposeInHistory(conversationId: string, history: DMessage[]): DMessage[] {
   const systemMessageIndex = history.findIndex(m => m.role === 'system');
   const systemMessage: DMessage = systemMessageIndex >= 0 ? history.splice(systemMessageIndex, 1)[0] : createDMessage('system', '');
-  if (!systemMessage.updated && purposeId && SystemPurposes[purposeId]?.systemMessage) {
-    systemMessage.purposeId = purposeId;
-    systemMessage.text = SystemPurposes[purposeId].systemMessage
-      .replaceAll('{{Today}}', new Date().toISOString().split('T')[0]);
-
-    // HACK: this is a special case for the "Custom" persona, to set the message in stone (so it doesn't get updated when switching to another persona)
-    if (purposeId === 'Custom')
-      systemMessage.updated = Date.now();
+  
+  // Use fallback system prompt if no system message exists yet
+  if (!systemMessage.updated && !systemMessage.text) {
+    const { FALLBACK_SYSTEM_PROMPT } = require('~/conversational-search.config');
+    systemMessage.text = FALLBACK_SYSTEM_PROMPT.replaceAll('{{Today}}', new Date().toISOString().split('T')[0]);
   }
+  
   history.unshift(systemMessage);
   useChatStore.getState().setMessages(conversationId, history);
   return history;

@@ -92,7 +92,7 @@ export function ChatDrawerItems(props: {
     // group conversations by persona
     const groupedConversations: { [personaId: string]: string[] } = {};
     conversations.forEach(conversation => {
-      const persona = conversation.systemPurposeId;
+      const persona = 'conv_search'; // All conversations use the same persona now
       if (persona) {
         if (!groupedConversations[persona])
           groupedConversations[persona] = [];

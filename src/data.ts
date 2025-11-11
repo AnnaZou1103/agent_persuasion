@@ -1,10 +1,11 @@
 import * as React from 'react';
-export const ChatBotType: SystemPurposeId[] =["suggestion", "clarification"]
-export type SystemPurposeId = "suggestion" | "clarification" | 'Custom'
+export const ChatBotType: SystemPurposeId[] =["conv_search"]
+export type SystemPurposeId =  "conv_search" | 'Custom'
 
 export const defaultSystemPurposeId: SystemPurposeId = ChatBotType[Math.floor(Math.random() * ChatBotType.length)];
 import {DMessage} from '~/common/state/store-chats';
 import {v4 as uuidv4 } from 'uuid';
+import { FALLBACK_SYSTEM_PROMPT } from '~/conversational-search.config';
 
 type SystemPurposeData = {
   title: string;
@@ -18,19 +19,10 @@ type SystemPurposeData = {
 };
 
 export const SystemPurposes: { [key in SystemPurposeId]: SystemPurposeData } = {
-    "suggestion": {
+    "conv_search": {
         "title": "ChatBot",
-        "description": "suggestion",
-        "systemMessage": "",
-        "symbol": "💡",
-        "examples": [
-            "how are you today?"
-        ]
-    },
-    "clarification": {
-        "title": "ChatBot",
-        "description": "clarification",
-        "systemMessage": "",
+        "description": "Default Conversation Search Persona",
+        "systemMessage": FALLBACK_SYSTEM_PROMPT,
         "symbol": "💡",
         "examples": [
             "how are you today?"

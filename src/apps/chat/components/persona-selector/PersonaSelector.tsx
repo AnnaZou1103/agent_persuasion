@@ -50,18 +50,12 @@ export function PersonaSelector(props: { conversationId: string, runExample: (ex
     experimentalLabs: state.experimentalLabs,
     showFinder: state.showPurposeFinder,
   }), shallow);
-  const { systemPurposeId, setSystemPurposeId } = useChatStore(state => {
-    const conversation = state.conversations.find(conversation => conversation.id === props.conversationId);
-    return {
-      systemPurposeId: conversation ? conversation.systemPurposeId : null,
-      setSystemPurposeId: conversation ? state.setSystemPurposeId : null,
-    };
-  }, shallow);
+  // Simplified: Always use 'conv_search' persona
+  const systemPurposeId: SystemPurposeId = 'conv_search';
+  const setSystemPurposeId = () => {
+    // No-op: only one persona available
+  };
   const { hiddenPurposeIDs, toggleHiddenPurposeId } = usePurposeStore(state => ({ hiddenPurposeIDs: state.hiddenPurposeIDs, toggleHiddenPurposeId: state.toggleHiddenPurposeId }), shallow);
-
-  // safety check - shouldn't happen
-  if (!systemPurposeId || !setSystemPurposeId)
-    return null;
 
 
   const handleSearchClear = () => {
@@ -100,8 +94,7 @@ export function PersonaSelector(props: { conversationId: string, runExample: (ex
 
 
   const handlePurposeChanged = (purposeId: SystemPurposeId | null) => {
-    if (purposeId)
-      setSystemPurposeId(props.conversationId, purposeId);
+    // No-op: only one persona available
   };
 
   const handleCustomSystemMessageChange = (v: React.ChangeEvent<HTMLTextAreaElement>): void => {

@@ -64,8 +64,7 @@ export function updateSearchHistory(
  */
 export function prepareHistoryWithSearchContext(
   history: DMessage[],
-  enhancedSystemMessage: string,
-  purposeId: SystemPurposeId
+  enhancedSystemMessage: string
 ): DMessage[] {
   // Find existing system message
   const systemMessageIndex = history.findIndex(msg => msg.role === 'system');
@@ -78,7 +77,6 @@ export function prepareHistoryWithSearchContext(
     avatar: null,
     typing: false,
     role: 'system',
-    purposeId: purposeId,
     tokenCount: 0,
     created: Date.now(),
     updated: Date.now(),
