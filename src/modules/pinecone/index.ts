@@ -31,6 +31,7 @@ export {
 export {
   retrieveContext,
   filterSnippetsByStandpoint,
+  filterSnippetsByScore,
   formatSnippetsForPrompt,
 } from './pinecone.client';
 

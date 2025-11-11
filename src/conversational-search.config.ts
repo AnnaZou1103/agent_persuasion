@@ -27,7 +27,7 @@ export const CONVERSATIONAL_SEARCH_DEFAULTS = {
   // ============================================
   
   /** default topK (1-50) */
-  defaultTopK: 5,
+  defaultTopK: 10,
   
   /** default snippetSize (512-4096) */
   defaultSnippetSize: 1280,
@@ -43,6 +43,19 @@ export const CONVERSATIONAL_SEARCH_DEFAULTS = {
   
   /** max snippetSize (512-4096) */
   snippetSizeMax: 4096,
+  
+  // ============================================
+  // similarity score filtering
+  // ============================================
+  
+  /** minimum similarity score threshold (0.0-1.0) */
+  minSimilarityScore: 0.7,
+  
+  /** warn if best score is below this threshold */
+  warnThreshold: 0.5,
+  
+  /** enable score filtering */
+  enableScoreFiltering: true,
   
   // ============================================
   // prompt template config

@@ -12,6 +12,7 @@ import {
 import {
   retrieveContext,
   filterSnippetsByStandpoint,
+  filterSnippetsByScore,
   formatSnippetsForPrompt,
 } from './pinecone.client';
 import { 
@@ -78,10 +79,25 @@ export async function retrieveContextForQuery(
     conversationHistory: state.dialogueHistory,
   });
 
-  // Filter by standpoint (if needed)
-  const filteredSnippets = filterSnippetsByStandpoint(snippets, state.standpoint);
+  console.log(`[Search] Retrieved ${snippets.length} snippets from Pinecone`);
 
-  return filteredSnippets;
+  // Filter by similarity score first (if enabled)
+  let filteredSnippets = snippets;
+  if (CONVERSATIONAL_SEARCH_DEFAULTS.enableScoreFiltering) {
+    filteredSnippets = filterSnippetsByScore(snippets, CONVERSATIONAL_SEARCH_DEFAULTS.minSimilarityScore);
+    
+    // Warn if best score is low
+    if (snippets.length > 0 && snippets[0].score < CONVERSATIONAL_SEARCH_DEFAULTS.warnThreshold) {
+      console.warn(`[Search] Best similarity score is low: ${snippets[0].score.toFixed(4)} (threshold: ${CONVERSATIONAL_SEARCH_DEFAULTS.warnThreshold})`);
+    }
+  }
+
+  // Then filter by standpoint
+  const finalSnippets = filterSnippetsByStandpoint(filteredSnippets, state.standpoint);
+
+  console.log(`[Search] Final result: ${finalSnippets.length} snippets after filtering`);
+
+  return finalSnippets;
 }
 
 /**

@@ -59,6 +59,27 @@ export async function retrieveContext(
 }
 
 /**
+ * Filter snippets based on similarity score threshold
+ * 
+ * @param snippets - Array of snippets to filter
+ * @param minScore - Minimum similarity score (0.0-1.0)
+ * @returns Filtered snippets with score >= minScore
+ */
+export function filterSnippetsByScore(
+  snippets: PineconeSnippet[],
+  minScore: number = 0.7
+): PineconeSnippet[] {
+  const filtered = snippets.filter(snippet => snippet.score >= minScore);
+  
+  if (filtered.length < snippets.length) {
+    console.log(`[Score Filter] Filtered out ${snippets.length - filtered.length} low-score snippets (min: ${minScore})`);
+    console.log(`[Score Filter] Remaining: ${filtered.length} snippets`);
+  }
+  
+  return filtered;
+}
+
+/**
  * Filter snippets based on standpoint
  * 
  * WORKAROUND: Since Pinecone REST API doesn't support metadata,
