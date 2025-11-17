@@ -42,7 +42,23 @@ export interface ContextRetrievalOptions {
   top_k?: number;
   snippet_size?: number;
   standpoint?: Standpoint;
-  conversationHistory?: string[];
+}
+
+// Conversation statistics for research tracking
+export interface ConversationStats {
+  searchTriggerCount: number;
+  clarificationQuestionCount: number;
+  suggestionCount: number;
+  conversationTurns: number;
+  lastSearchQuery?: string;
+  lastSearchTimestamp?: number;
+}
+
+// Clarification state tracking
+export interface ClarificationState {
+  isAwaitingClarification: boolean;
+  pendingClarificationQuestions: string[];
+  isReadyForSearch: boolean; // User has answered enough or expressed need for search
 }
 
 // Conversational search state
@@ -52,5 +68,9 @@ export interface ConversationalSearchState {
   strategy: ConversationStrategy;
   dialogueHistory: string[];
   lastRetrievedContext?: PineconeSnippet[];
+  
+  // New fields for enhanced framework
+  stats: ConversationStats;
+  clarificationState?: ClarificationState; // Only used when strategy is 'clarification'
 }
 

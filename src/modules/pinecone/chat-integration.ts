@@ -5,19 +5,30 @@
 import { DMessage } from '~/common/state/store-chats';
 import { useConversationalSearchStore } from './store-conversational-search';
 import { SystemPurposeId } from '~/data';
+import { DLLMId } from '~/modules/llms/store-llms';
+import { 
+  determineConversationAction,
+  generateSystemPrompt,
+} from './conversational-search';
 
 /**
- * Process user message with conversational search
+ * Process user message with conversational search using new framework
  * Returns enhanced system message if search is enabled
  */
 export async function processUserMessageWithSearch(
   userMessage: string,
-  history: DMessage[]
+  history: DMessage[],
+  llmId?: DLLMId
 ): Promise<{
   shouldEnhance: boolean;
   enhancedSystemMessage?: string;
   originalSystemMessage?: string;
   context?: any[];
+  actionTaken?: {
+    searched: boolean;
+    askedClarification: boolean;
+    providedSuggestion: boolean;
+  };
 }> {
   const searchStore = useConversationalSearchStore.getState();
   
@@ -27,9 +38,40 @@ export async function processUserMessageWithSearch(
   }
 
   try {
-    // Perform search and get system prompt with context
-    const { systemPrompt, context } = await searchStore.performSearch(userMessage);
+    const state = searchStore.searchState;
     
+    // Step 1: Determine conversation action based on strategy
+    const action = await determineConversationAction(userMessage, state, llmId);
+    
+    console.log('[Conversation Framework] Action determined:', {
+      strategy: state.strategy,
+      shouldSearch: action.shouldSearch,
+      shouldAskClarification: action.shouldAskClarification,
+      shouldProvideSuggestion: action.shouldProvideSuggestion,
+    });
+
+    let systemPrompt: string;
+    let context: any[] = [];
+    let actionTaken = {
+      searched: false,
+      askedClarification: false,
+      providedSuggestion: false,
+    };
+
+    // Step 2: Execute action
+    if (action.shouldSearch) {
+      // Perform RAG search
+      const searchResult = await searchStore.performSearch(userMessage);
+      systemPrompt = searchResult.systemPrompt;
+      context = searchResult.context || [];
+      actionTaken.searched = true;
+    } else {
+      // Generate system prompt without search (for clarification or when search not needed)
+      systemPrompt = generateSystemPrompt(state, []);
+      actionTaken.askedClarification = action.shouldAskClarification;
+      actionTaken.providedSuggestion = action.shouldProvideSuggestion;
+    }
+
     // Get original system message from history if exists
     const originalSystemMessage = history.find(msg => msg.role === 'system')?.text;
 
@@ -38,6 +80,7 @@ export async function processUserMessageWithSearch(
       enhancedSystemMessage: systemPrompt,
       originalSystemMessage,
       context,
+      actionTaken,
     };
   } catch (error) {
     console.error('Error in conversational search:', error);
@@ -50,12 +93,18 @@ export async function processUserMessageWithSearch(
  */
 export function updateSearchHistory(
   userMessage: string,
-  assistantResponse: string
+  assistantResponse: string,
+  actionTaken?: {
+    searched: boolean;
+    askedClarification: boolean;
+    providedSuggestion: boolean;
+  },
+  retrievedContext?: any[]
 ): void {
   const searchStore = useConversationalSearchStore.getState();
   
   if (searchStore.isEnabled && searchStore.searchState) {
-    searchStore.updateHistory(userMessage, assistantResponse);
+    searchStore.updateHistory(userMessage, assistantResponse, actionTaken, retrievedContext);
   }
 }
 

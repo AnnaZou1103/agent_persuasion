@@ -40,7 +40,16 @@ interface ConversationalSearchStore {
     systemPrompt: string;
     context: PineconeSnippet[];
   }>;
-  updateHistory: (userQuery: string, assistantResponse: string) => void;
+  updateHistory: (
+    userQuery: string, 
+    assistantResponse: string,
+    actionTaken?: {
+      searched: boolean;
+      askedClarification: boolean;
+      providedSuggestion: boolean;
+    },
+    retrievedContext?: PineconeSnippet[]
+  ) => void;
   
   // Getters
   getSystemPrompt: () => string | null;
@@ -128,7 +137,16 @@ export const useConversationalSearchStore = create<ConversationalSearchStore>()(
         }
       },
 
-      updateHistory: (userQuery: string, assistantResponse: string) => {
+      updateHistory: (
+        userQuery: string, 
+        assistantResponse: string,
+        actionTaken?: {
+          searched: boolean;
+          askedClarification: boolean;
+          providedSuggestion: boolean;
+        },
+        retrievedContext?: PineconeSnippet[]
+      ) => {
         const { searchState } = get();
         if (!searchState) return;
 
@@ -136,7 +154,8 @@ export const useConversationalSearchStore = create<ConversationalSearchStore>()(
           searchState,
           userQuery,
           assistantResponse,
-          searchState.lastRetrievedContext
+          retrievedContext || searchState.lastRetrievedContext,
+          actionTaken
         );
 
         set({ searchState: updatedState });

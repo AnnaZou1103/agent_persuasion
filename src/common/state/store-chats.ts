@@ -3,7 +3,7 @@ import { createJSONStorage, devtools, persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 
 import { DLLMId, useModelsStore } from '~/modules/llms/store-llms';
-import { Standpoint, ConversationStrategy } from '~/modules/pinecone/pinecone.types';
+import { Standpoint, ConversationStrategy, ConversationStats } from '~/modules/pinecone/pinecone.types';
 
 import { countModelTokens } from '../util/token-counter';
 import { defaultSystemPurposeId, SystemPurposeId, SurveyQuestions, ChatBotType } from '../../data';
@@ -28,6 +28,7 @@ export interface DConversation {
   searchTopic?: string;              // Topic for conversational search
   standpoint?: Standpoint;           // Chatbot's standpoint: 'supporting' or 'opposing'
   strategy?: ConversationStrategy;   // Conversation strategy: 'suggestion' or 'clarification'
+  stats?: ConversationStats;         // Conversation statistics for research tracking
   
   tokenCount: number;                 // f(messages, llmId)
   created: number;                    // created timestamp
@@ -204,6 +205,7 @@ interface ChatActions {
   setAutoTitle: (conversationId: string, autoTitle: string) => void;
   setUserTitle: (conversationId: string, userTitle: string) => void;
   setSearchConfig: (conversationId: string, config: { topic?: string; standpoint?: Standpoint; strategy?: ConversationStrategy }) => void;
+  setSearchStats: (conversationId: string, stats: ConversationStats) => void;
   getPairedQuestionId: (conversationId: string, messageId: string) => string;
   isConversation: (conversation: DConversation)=>boolean;
   setPairedEvaluationId:(conversationId: string, evaluationId: string)=>void;
@@ -525,6 +527,9 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
             ...(config.standpoint !== undefined && { standpoint: config.standpoint }),
             ...(config.strategy !== undefined && { strategy: config.strategy }),
           }),
+
+      setSearchStats: (conversationId: string, stats: ConversationStats) =>
+        get()._editConversation(conversationId, { stats }),
 
       appendEphemeral: (conversationId: string, ephemeral: DEphemeral) =>
         get()._editConversation(conversationId, conversation => {

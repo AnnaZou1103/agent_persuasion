@@ -11,6 +11,7 @@ import { DMessage, useChatStore } from '~/common/state/store-chats';
 import { createAssistantTypingMessage, updatePurposeInHistory } from './editors';
 import { processUserMessageWithSearch, prepareHistoryWithSearchContext, updateSearchHistory } from '~/modules/pinecone/chat-integration';
 import { useConversationalSearchStore } from '~/modules/pinecone/store-conversational-search';
+import { PineconeSnippet } from '~/modules/pinecone/pinecone.types';
 
 
 /**
@@ -35,15 +36,55 @@ export async function runAssistantUpdatingState(conversationId: string, history:
   // Now try to enhance with conversational search (in background while showing typing)
   let enhancedHistory = history;
   let assistantResponseText = '';
-  let retrievedContext: any[] | undefined;
+  let retrievedContext: any[] | undefined; // For message attachment (simplified format)
+  let retrievedContextForState: PineconeSnippet[] | undefined; // For state storage (PineconeSnippet format)
+  let actionTaken: { searched: boolean; askedClarification: boolean; providedSuggestion: boolean } | undefined;
   
   if (lastUserMessage) {
     try {
-      const searchResult = await processUserMessageWithSearch(lastUserMessage, history);
+      const searchResult = await processUserMessageWithSearch(lastUserMessage, history, assistantLlmId);
+      const searchStore = useConversationalSearchStore.getState();
+      
+      // Update stats if search is enabled and state exists
+      if (searchStore.searchState) {
+        // Store action taken for logging (before using it)
+        actionTaken = searchResult.actionTaken;
+        
+        // Always update conversationTurns when user submits a message
+        // Update other stats only if actionTaken is available
+        const currentStats = searchStore.searchState.stats;
+        const updatedStats = {
+          ...currentStats,
+          conversationTurns: currentStats.conversationTurns + 1,
+          ...(actionTaken?.searched && {
+            searchTriggerCount: currentStats.searchTriggerCount + 1,
+            lastSearchQuery: lastUserMessage,
+            lastSearchTimestamp: Date.now(),
+          }),
+          ...(actionTaken?.askedClarification && {
+            clarificationQuestionCount: currentStats.clarificationQuestionCount + 1,
+          }),
+          ...(actionTaken?.providedSuggestion && {
+            suggestionCount: currentStats.suggestionCount + 1,
+          }),
+        };
+        
+        // Save stats to conversation (will be persisted to IndexedDB and MongoDB)
+        useChatStore.getState().setSearchStats(conversationId, updatedStats);
+        
+        // Also update searchStore.searchState.stats to keep them in sync
+        // This ensures updateSearchHistory will use the correct stats later
+        const updatedSearchState = {
+          ...searchStore.searchState,
+          stats: updatedStats,
+        };
+        useConversationalSearchStore.setState({ searchState: updatedSearchState });
+        
+        console.log('[Search Stats] Updated and saved to conversation:', updatedStats);
+      }
       
       if (searchResult.shouldEnhance && searchResult.enhancedSystemMessage) {
         // Save search configuration to conversation for MongoDB storage
-        const searchStore = useConversationalSearchStore.getState();
         if (searchStore.searchState) {
           useChatStore.getState().setSearchConfig(conversationId, {
             topic: searchStore.searchState.topic,
@@ -55,6 +96,12 @@ export async function runAssistantUpdatingState(conversationId: string, history:
             standpoint: searchStore.searchState.standpoint,
             strategy: searchStore.searchState.strategy,
           });
+          
+          // Store retrieved context in original format for state storage
+          // Only store if search was actually performed
+          if (actionTaken?.searched) {
+            retrievedContextForState = searchResult.context || [];
+          }
         }
         
         // Use enhanced system message with retrieved context
@@ -63,7 +110,7 @@ export async function runAssistantUpdatingState(conversationId: string, history:
           searchResult.enhancedSystemMessage
         );
         
-        // Store retrieved context for later attachment to assistant message
+        // Store retrieved context for later attachment to assistant message (simplified format)
         if (searchResult.context && searchResult.context.length > 0) {
           retrievedContext = searchResult.context.map(snippet => ({
             content: snippet.content,
@@ -71,7 +118,7 @@ export async function runAssistantUpdatingState(conversationId: string, history:
             source: snippet.reference?.file?.name,
             pages: snippet.reference?.pages,
           }));
-        } else {
+        } else if (actionTaken?.searched) {
           // Mark as "search performed but no results found"
           console.log('[Search] No context found for query:', lastUserMessage);
           retrievedContext = [{
@@ -79,6 +126,11 @@ export async function runAssistantUpdatingState(conversationId: string, history:
             score: 0,
             isNoResultMarker: true,
           }];
+        }
+        
+        // Log action taken
+        if (actionTaken) {
+          console.log('[Conversation Framework] Action taken:', actionTaken);
         }
       } else {
         // Fall back to normal system message update
@@ -121,9 +173,14 @@ export async function runAssistantUpdatingState(conversationId: string, history:
     console.log('[Context Storage] No context - search not performed or error occurred');
   }
 
-  // Update conversational search history
+  // Update conversational search history with action taken
   if (lastUserMessage && assistantResponseText) {
-    updateSearchHistory(lastUserMessage, assistantResponseText);
+    updateSearchHistory(
+      lastUserMessage, 
+      assistantResponseText,
+      actionTaken,
+      retrievedContextForState // Use original PineconeSnippet format for state storage
+    );
   }
 
   // clear to send, again

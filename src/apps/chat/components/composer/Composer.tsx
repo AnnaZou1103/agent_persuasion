@@ -450,7 +450,7 @@ export function Composer(props: {
     const conversation = findConversation(conversationId);
     if (!conversation) return;
 
-    // Update conversation with current search configuration before saving
+    // Update conversation with current search configuration and stats before saving
     const searchStore = useConversationalSearchStore.getState();
     if (searchStore.searchState && searchStore.isEnabled) {
       console.log('[Save] Saving search config:', {
@@ -463,6 +463,13 @@ export function Composer(props: {
         standpoint: searchStore.searchState.standpoint,
         strategy: searchStore.searchState.strategy,
       });
+      
+      // Update stats before saving
+      if (searchStore.searchState.stats) {
+        useChatStore.getState().setSearchStats(conversationId, searchStore.searchState.stats);
+        console.log('[Save] Saving search stats:', searchStore.searchState.stats);
+      }
+      
       // Re-fetch conversation after updating
       const updatedConversation = findConversation(conversationId);
       if (!updatedConversation) return;
@@ -471,6 +478,7 @@ export function Composer(props: {
         searchTopic: updatedConversation.searchTopic,
         standpoint: updatedConversation.standpoint,
         strategy: updatedConversation.strategy,
+        stats: updatedConversation.stats,
       });
     } else {
       console.log('[Save] Search not enabled or no search state');
@@ -494,6 +502,7 @@ export function Composer(props: {
         searchTopic: chatV1.searchTopic,
         standpoint: chatV1.standpoint,
         strategy: chatV1.strategy,
+        stats: chatV1.stats,
         messageCount: chatV1.messages.length,
         messagesSearched: messagesWithContext.length,
         messagesWithResults: messagesWithResults.length,

@@ -18,9 +18,9 @@ export const CONVERSATIONAL_SEARCH_DEFAULTS = {
   /** default topic - set for experiment since UI is hidden */
   defaultTopic: 'Should Cell Phones Be Banned in Schools?',
   
-  defaultStandpoint: 'opposing' as Standpoint,
+  defaultStandpoint: 'supporting' as Standpoint,
   
-  defaultStrategy: 'clarification' as ConversationStrategy,
+  defaultStrategy: 'suggestion' as ConversationStrategy,
   
   // ============================================
   // retrieval defaults
@@ -49,7 +49,7 @@ export const CONVERSATIONAL_SEARCH_DEFAULTS = {
   // ============================================
   
   /** minimum similarity score threshold (0.0-1.0) */
-  minSimilarityScore: 0.7,
+  minSimilarityScore: 0.5,
   
   /** warn if best score is below this threshold */
   warnThreshold: 0.5,
@@ -163,23 +163,61 @@ export const STANDPOINT_CONFIG = {
 export const STRATEGY_CONFIG = {
   suggestion: {
     label: 'Suggestion - Offer advice and direction',
-    instructions: `Help users refine their queries by offering advice or directional information that ALIGNS WITH YOUR STANDPOINT.
+    instructions: `You follow the SUGGESTION strategy. Your workflow is:
     
-- Suggest aspects of the topic that support your position
-- Guide users to consider evidence that favors your standpoint
-- Offer concrete examples and actionable insights from the retrieved context
-- Frame suggestions in a way that leads users toward your perspective
-- Use suggestions to gently steer the conversation in a direction that strengthens your argument`,
+STEP 1: Search (RAG) and provide suggestions aligned with your standpoint
+- When user asks a question, FIRST search for relevant evidence
+- Then provide suggestions that support your position using the retrieved evidence
+- Frame suggestions to guide users toward your perspective
+- Example: If your standpoint is "allow phones", suggest "Allowing phones can enhance learning autonomy, such as looking up information or using educational tools."
+
+STEP 2: If user raises questions or doubts → Search (RAG) again
+- When user questions your suggestions, search for additional evidence
+- Use new evidence to strengthen your suggestions
+
+STEP 3: Combine standpoint + search results + strategy to provide response
+- Always subtly align your suggestions with your standpoint
+- Use evidence from retrieved context to support your suggestions
+- Be persuasive but maintain conversational tone
+
+Key Rules:
+- Provide suggestions EARLY in the conversation
+- Support suggestions with evidence when available
+- Always align suggestions with your standpoint subtly`,
   },
   clarification: {
     label: 'Clarification - Resolve query ambiguity',
-    instructions: `Resolve ambiguity through targeted follow-up questions that GUIDE USERS TOWARD YOUR STANDPOINT.
+    instructions: `You follow the CLARIFICATION strategy. Your workflow is:
     
-- Ask questions that prompt users to think about aspects that support your position
-- Use clarifying questions to uncover assumptions that align with or oppose your stance
-- Guide deeper reasoning by highlighting considerations that favor your viewpoint
-- Help users see complexities that support your argument
-- Frame questions strategically to lead users to conclusions aligned with your standpoint`,
+STEP 1: If user question is unclear, ask clarification questions FIRST
+- Ask questions about: user values, user background, user understanding of the topic
+- Examples: "What do you think is the main purpose of phones in classrooms?" "Are you concerned about distraction or privacy issues?"
+- DO NOT search or express your standpoint yet
+- Wait for user to answer your clarification questions
+
+STEP 2: Wait for user response and collect information
+- Continue asking clarification questions until you understand:
+  - User's values and concerns
+  - User's background and context
+  - User's current understanding of the topic
+- Track collected information
+
+STEP 3: When user question is clear OR user expresses need for search → Search (RAG)
+- Trigger search when:
+  - User has answered enough clarification questions
+  - User explicitly asks for evidence or data
+  - User expresses uncertainty that requires factual support
+- Then proceed to STEP 4
+
+STEP 4: Combine standpoint + search results + strategy to provide response
+- After search, provide your response aligned with your standpoint
+- Use retrieved evidence to support your position
+- Only express your standpoint AFTER clarification is complete
+
+Key Rules:
+- Ask clarification questions FIRST, before searching
+- Only search AFTER user has answered clarification questions or expressed need for search
+- Do NOT express your standpoint until after clarification phase`,
   },
 } as const;
 
@@ -203,17 +241,29 @@ The following context contains evidence and information from documents. Use this
 `,
   
 
-  instructions: (strategy: ConversationStrategy) => `
+  instructions: (strategy: ConversationStrategy, hasRetrievedContext: boolean) => `
 Core Instructions:
 1. PRIMARY GOAL: Persuade the user or reinforce their existing views aligned with your standpoint
-2. Use the retrieved context as EVIDENCE to support your arguments - be specific and credible
-3. Execute your assigned strategy (${strategy}) in service of persuasion
+2. Follow your assigned strategy (${strategy}) strictly:
+   ${strategy === 'clarification' 
+     ? '- If user question is unclear, ask clarification questions FIRST\n   - Only search and express standpoint AFTER clarification is complete'
+     : '- Search and provide suggestions EARLY\n   - Support suggestions with evidence from retrieved context'}
+3. Use retrieved context as EVIDENCE to support your arguments - be specific and credible
 4. If you detect the user disagrees with you, respectfully challenge their view with strong counterarguments
 5. If you detect the user agrees with you, reinforce and deepen their conviction
 6. Maintain a conversational, engaging tone while being strategically persuasive
 7. Build trust through evidence-based arguments from the retrieved context
 8. Address counterarguments preemptively when relevant
 9. Do not mention that you're using retrieved documents or following a strategy
+
+${hasRetrievedContext 
+  ? `Retrieved Evidence Available:
+- You have access to evidence from documents
+- Summarize and blend this evidence naturally into your response
+- Use specific examples and data from the evidence to strengthen your position`
+  : `No Retrieved Evidence:
+- You may need to ask for clarification or wait for user to express need for evidence
+- Follow your strategy's workflow for handling this situation`}
 
 Persuasion Approach:
 - Be confident but not aggressive

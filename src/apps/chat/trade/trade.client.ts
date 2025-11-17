@@ -5,6 +5,7 @@ import { defaultSystemPurposeId, SystemPurposeId, SystemPurposes } from '../../.
 import { DModelSource, useModelsStore } from '~/modules/llms/store-llms';
 
 import { DConversation, DMessage, useChatStore } from '~/common/state/store-chats';
+import { ConversationStats } from '~/modules/pinecone/pinecone.types';
 import { prettyBaseModel } from '~/common/util/modelUtils';
 
 import { ImportedOutcome } from './import/ImportOutcomeModal';
@@ -56,6 +57,7 @@ export function createConversationFromJsonV1(part: ExportedConversationJsonV1 & 
     ...(part.searchTopic && { searchTopic: part.searchTopic }),
     ...(part.standpoint && { standpoint: part.standpoint as any }),
     ...(part.strategy && { strategy: part.strategy as any }),
+    ...(part.stats && { stats: part.stats }),
     tokenCount: part.tokenCount || 0,
     created: part.created || Date.now(),
     updated: part.updated || Date.now(),
@@ -151,6 +153,7 @@ type ExportedConversationJsonV1 = {
   searchTopic?: string;
   standpoint?: string;
   strategy?: string;
+  stats?: ConversationStats;
   created: number;
   updated: number | null;
 }
