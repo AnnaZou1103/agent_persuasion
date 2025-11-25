@@ -1,6 +1,6 @@
 import { DLLMId } from '~/modules/llms/store-llms';
 import { SystemPurposeId, SystemPurposes } from '../../../data';
-import { STANDPOINT_CONFIG, STRATEGY_CONFIG, FALLBACK_SYSTEM_PROMPT, SERVICE_ASSISTANT_PROMPT } from '~/conversational-search.config';
+import { STANDPOINT_CONFIG, STRATEGY_CONFIG, FALLBACK_SYSTEM_PROMPT, SERVICE_ASSISTANT_PROMPT, STANDPOINT_CONCEALMENT_RULE } from '~/conversational-search.config';
 
 import { createDMessage, DMessage, useChatStore } from '~/common/state/store-chats';
 
@@ -53,7 +53,7 @@ export function updatePurposeInHistory(conversationId: string, history: DMessage
       systemPrompt = `Conversation Topic: ${topic}\n\n${systemPrompt}`;
     }
   } else {
-    // Dialogue phase: build system prompt with: general task instruction → topic → standpoint → strategy
+    // Dialogue phase: build system prompt with: general task instruction → topic → standpoint → strategy → standpoint concealment rule
     let systemPromptParts: string[] = [];
     
     // Always add general task instruction first (FALLBACK_SYSTEM_PROMPT)
@@ -72,6 +72,11 @@ export function updatePurposeInHistory(conversationId: string, history: DMessage
     // Add strategy instructions if it exists
     if (strategy && STRATEGY_CONFIG[strategy]) {
       systemPromptParts.push(STRATEGY_CONFIG[strategy].instructions);
+    }
+    
+    // Add unified standpoint concealment rule if either standpoint or strategy is configured
+    if ((standpoint && STANDPOINT_CONFIG[standpoint]) || (strategy && STRATEGY_CONFIG[strategy])) {
+      systemPromptParts.push(STANDPOINT_CONCEALMENT_RULE);
     }
     
     // Build the complete system prompt
