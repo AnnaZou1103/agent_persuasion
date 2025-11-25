@@ -119,7 +119,7 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
       preferredLanguage: (typeof navigator !== 'undefined') && navigator.language || 'en-US',
       setPreferredLanguage: (preferredLanguage: string) => set({ preferredLanguage }),
 
-      centerMode: 'wide',
+      centerMode: 'full',
       setCenterMode: (centerMode: 'narrow' | 'wide' | 'full') => set({ centerMode }),
 
       doubleClickToEdit: true,

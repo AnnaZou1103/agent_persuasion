@@ -33,7 +33,7 @@ export function UISettings() {
   }), shallow);
   const { closeSettings } = useUIStateStore(state => ({ closeSettings: state.closeSettings }), shallow);
 
-  const handleCenterModeChange = (event: React.ChangeEvent<HTMLInputElement>) => setCenterMode(event.target.value as 'narrow' | 'wide' | 'full' || 'wide');
+  const handleCenterModeChange = (event: React.ChangeEvent<HTMLInputElement>) => setCenterMode(event.target.value as 'narrow' | 'wide' | 'full' || 'full');
 
   const handleEnterToSendChange = (event: React.ChangeEvent<HTMLInputElement>) => setEnterToSend(event.target.checked);
 

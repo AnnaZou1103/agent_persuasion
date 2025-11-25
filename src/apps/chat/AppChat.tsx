@@ -26,6 +26,8 @@ import { runReActUpdatingState } from './editors/react-tangent';
 import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { ChatMessage } from './components/message/ChatMessage';
+import { TopicSelectionModal } from './components/TopicSelectionModal';
+import { ConversationTopic } from './topics';
 
 const SPECIAL_ID_ALL_CHATS = 'all-chats';
 
@@ -40,7 +42,7 @@ export function AppChat() {
   const [flattenConversationId, setFlattenConversationId] = React.useState<string | null>(null);
 
   // external state
-  const { activeConversationId, activeEvaluationId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId } = useChatStore(state => {
+  const { activeConversationId, activeEvaluationId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId, setSearchConfig } = useChatStore(state => {
     const conversation = state.conversations.find(conversation => conversation.id === state.activeConversationId);
     const isConversationEmpty = conversation ? !conversation.messages.length : true;
     const hasAnyContent = state.conversations.length > 1 || !isConversationEmpty;
@@ -54,8 +56,46 @@ export function AppChat() {
       setMessages: state.setMessages,
       setAutoTitle: state.setAutoTitle,
       setActiveEvaluationId: state.setActiveEvaluationId,
+      setSearchConfig: state.setSearchConfig,
     };
   }, shallow);
+
+  // Get current conversation details
+  const currentConversation = useChatStore(state => 
+    state.conversations.find(c => c.id === activeConversationId)
+  );
+
+  // Check if conversation has user messages (conversation has started)
+  const hasUserMessages = currentConversation 
+    ? currentConversation.messages.some(msg => msg.role === 'user')
+    : false;
+
+  // Check if we should show topic selection modal
+  // Show if: conversation is empty AND no topic selected AND conversation hasn't started
+  const shouldShowTopicSelection = React.useMemo(() => {
+    if (!activeConversationId || !currentConversation) return false;
+    if (hasUserMessages) return false; // Don't show if conversation has started
+    if (currentConversation.searchTopic) return false; // Don't show if topic already selected
+    return true; // Show if conversation is empty and no topic
+  }, [activeConversationId, currentConversation, hasUserMessages]);
+
+  // Handle topic selection
+  const handleTopicSelect = (topic: ConversationTopic) => {
+    if (activeConversationId) {
+      setSearchConfig(activeConversationId, { topic });
+    }
+  };
+
+  // Generate initial message based on topic
+  const getInitialMessage = React.useMemo(() => {
+    if (currentConversation?.searchTopic) {
+      return {
+        ...initialmessage,
+        text: `Hello! I'm here to help you explore and learn about the following topic through conversation:\n\n**${currentConversation.searchTopic}**\n\nWhat would you like to discuss or learn more about regarding this topic?`,
+      };
+    }
+    return initialmessage;
+  }, [currentConversation?.searchTopic]);
 
 
   const handleExecuteConversation = async (chatModeId: ChatModeId, conversationId: string, history: DMessage[]) => {
@@ -206,13 +246,19 @@ export function AppChat() {
   }
 
   return <>
+    {/* Topic Selection Modal */}
+    <TopicSelectionModal
+      open={shouldShowTopicSelection}
+      onSelectTopic={handleTopicSelect}
+    />
+
     <Allotment css={{backgroundColor: '#EAEEF6'}}>
     <div style={{overflow: 'auto', height:'100%', width: '100%'}}>
     <ChatMessage
-          key={'msg-' + initialmessage.id} message={initialmessage} diffText={undefined}
+          key={'msg-' + getInitialMessage.id} message={getInitialMessage} diffText={undefined}
           isBottom={true}
           onMessageDelete={undefined}
-          onMessageEdit={newText => handleMessageDelete(initialmessage.id)}
+          onMessageEdit={newText => handleMessageDelete(getInitialMessage.id)}
           onMessageRunFrom={undefined}
           onImagine={undefined}
       />

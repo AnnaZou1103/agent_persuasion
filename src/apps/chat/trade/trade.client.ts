@@ -147,7 +147,7 @@ export function conversationToMarkdown(conversation: DConversation, hideSystemMe
 
 type ExportedConversationJsonV1 = {
   id: string;
-  messages: DMessage[];
+  messages: DMessage[];  // Includes system message (role='system')
   userTitle?: string;
   autoTitle?: string;
   searchTopic?: string;

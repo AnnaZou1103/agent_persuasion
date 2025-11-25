@@ -22,12 +22,17 @@ export async function runAssistantUpdatingState(conversationId: string, history:
 
   // When an abort controller is set, the UI switches to the "stop" mode
   const controller = new AbortController();
-  const { startTyping, editMessage } = useChatStore.getState();
+  const { startTyping, editMessage, setMessages } = useChatStore.getState();
   startTyping(conversationId, controller);
 
   // Use normal system message update (no search enhancement)
   const enhancedHistory = updatePurposeInHistory(conversationId, history);
   console.log('[Chat] Enhanced history', { length: enhancedHistory.length, systemMessage: enhancedHistory[0] });
+
+  // Ensure system message is saved to conversation.messages
+  // We'll save it after the stream completes to avoid interfering with the streaming
+  // Store the system message for later use
+  const systemMessageToSave = enhancedHistory[0]?.role === 'system' ? enhancedHistory[0] : null;
 
   // Update the assistant message purpose
   if (enhancedHistory[0]?.purposeId) {
@@ -43,6 +48,34 @@ export async function runAssistantUpdatingState(conversationId: string, history:
 
   // clear to send, again
   startTyping(conversationId, null);
+
+  // Save system message to conversation.messages after streaming is complete
+  if (systemMessageToSave) {
+    const conversation = useChatStore.getState().conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      const hasSystemMessage = conversation.messages.some(msg => msg.role === 'system');
+      
+      if (!hasSystemMessage) {
+        // Add system message to conversation.messages if it doesn't exist
+        const currentMessages = conversation.messages;
+        const messagesWithSystem = [systemMessageToSave, ...currentMessages];
+        setMessages(conversationId, messagesWithSystem);
+        console.log('[Chat] Added system message to conversation.messages after streaming', { 
+          systemMessageText: systemMessageToSave.text.substring(0, 50),
+          totalMessages: messagesWithSystem.length
+        });
+      } else {
+        // Update existing system message if needed
+        const existingSystemIndex = conversation.messages.findIndex(msg => msg.role === 'system');
+        if (existingSystemIndex >= 0 && conversation.messages[existingSystemIndex].text !== systemMessageToSave.text) {
+          const updatedMessages = [...conversation.messages];
+          updatedMessages[existingSystemIndex] = systemMessageToSave;
+          setMessages(conversationId, updatedMessages);
+          console.log('[Chat] Updated system message in conversation.messages after streaming');
+        }
+      }
+    }
+  }
 
   // auto-suggestions
   if (enableFollowUps)
