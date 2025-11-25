@@ -1,5 +1,6 @@
 import { DLLMId } from '~/modules/llms/store-llms';
 import { SystemPurposeId, SystemPurposes } from '../../../data';
+import { STANDPOINT_CONFIG, STRATEGY_CONFIG, FALLBACK_SYSTEM_PROMPT, SERVICE_ASSISTANT_PROMPT } from '~/conversational-search.config';
 
 import { createDMessage, DMessage, useChatStore } from '~/common/state/store-chats';
 
@@ -15,54 +16,94 @@ export function createAssistantTypingMessage(conversationId: string, assistantLl
 
 
 export function updatePurposeInHistory(conversationId: string, history: DMessage[]): DMessage[] {
-  const systemMessageIndex = history.findIndex(m => m.role === 'system');
-  const systemMessage: DMessage = systemMessageIndex >= 0 ? history.splice(systemMessageIndex, 1)[0] : createDMessage('system', '');
+  // Create a copy of history to avoid mutating the original array
+  const historyCopy = [...history];
+  const systemMessageIndex = historyCopy.findIndex(m => m.role === 'system');
+  const systemMessage: DMessage = systemMessageIndex >= 0 ? historyCopy.splice(systemMessageIndex, 1)[0] : createDMessage('system', '');
   
-  // Get conversation topic if it exists
+  // Get conversation configuration
   const conversation = useChatStore.getState().conversations.find(c => c.id === conversationId);
   const topic = conversation?.searchTopic;
+  const standpoint = conversation?.standpoint;
+  const strategy = conversation?.strategy;
+  const phase = conversation?.phase || 'dialogue';
   
-  // Use system purpose message if no system message exists yet
-  if (!systemMessage.updated && !systemMessage.text) {
-    const { defaultSystemPurposeId } = require('../../../data') as { defaultSystemPurposeId: SystemPurposeId };
-    const purpose = SystemPurposes[defaultSystemPurposeId as SystemPurposeId];
-    console.log('[Chat] updatePurposeInHistory: setting system message', { defaultSystemPurposeId, hasPurpose: !!purpose, topic });
-    if (purpose) {
-      let systemPrompt = purpose.systemMessage.replaceAll('{{Today}}', new Date().toISOString().split('T')[0]);
-      
-      // Add topic to system prompt if it exists
-      if (topic) {
-        systemPrompt = `Conversation Topic: ${topic}\n\n${systemPrompt}`;
-      }
-      
-      systemMessage.text = systemPrompt;
-      systemMessage.purposeId = defaultSystemPurposeId;
-      console.log('[Chat] updatePurposeInHistory: system message set', { textLength: systemMessage.text.length, purposeId: systemMessage.purposeId, hasTopic: !!topic });
-    } else {
-      // Fallback to FALLBACK_SYSTEM_PROMPT if purpose not found
-      const { FALLBACK_SYSTEM_PROMPT } = require('~/conversational-search.config');
-      let systemPrompt = FALLBACK_SYSTEM_PROMPT.replaceAll('{{Today}}', new Date().toISOString().split('T')[0]);
-      
-      // Add topic to system prompt if it exists
-      if (topic) {
-        systemPrompt = `Conversation Topic: ${topic}\n\n${systemPrompt}`;
-      }
-      
-      systemMessage.text = systemPrompt;
-      console.log('[Chat] updatePurposeInHistory: using fallback system prompt', { hasTopic: !!topic });
+  console.log('[Chat] updatePurposeInHistory: conversation config', { 
+    conversationId, 
+    topic, 
+    standpoint, 
+    strategy,
+    phase,
+    hasConversation: !!conversation,
+    historyLength: history.length,
+    historyCopyLength: historyCopy.length,
+    hasSystemMessage: systemMessageIndex >= 0,
+    userMessages: history.filter(m => m.role === 'user').length
+  });
+  
+  let systemPrompt: string;
+  
+  // Check phase: if memo phase, use service assistant prompt; otherwise use dialogue prompt
+  if (phase === 'memo') {
+    // Memo phase: use service assistant prompt
+    systemPrompt = SERVICE_ASSISTANT_PROMPT;
+    
+    // Add topic if it exists
+    if (topic) {
+      systemPrompt = `Conversation Topic: ${topic}\n\n${systemPrompt}`;
     }
   } else {
-    // If system message already exists, check if we need to update it with topic
-    if (topic && systemMessage.text && !systemMessage.text.includes(topic)) {
-      // Only update if topic is not already in the system message
-      systemMessage.text = `Conversation Topic: ${topic}\n\n${systemMessage.text}`;
-      console.log('[Chat] updatePurposeInHistory: added topic to existing system message');
+    // Dialogue phase: build system prompt with: general task instruction → topic → standpoint → strategy
+    let systemPromptParts: string[] = [];
+    
+    // Always add general task instruction first (FALLBACK_SYSTEM_PROMPT)
+    systemPromptParts.push(FALLBACK_SYSTEM_PROMPT);
+    
+    // Add topic if it exists
+    if (topic) {
+      systemPromptParts.push(`Conversation Topic: ${topic}`);
     }
-    console.log('[Chat] updatePurposeInHistory: system message already exists', { hasText: !!systemMessage.text, hasUpdated: !!systemMessage.updated });
+    
+    // Add standpoint instructions if it exists
+    if (standpoint && STANDPOINT_CONFIG[standpoint]) {
+      systemPromptParts.push(STANDPOINT_CONFIG[standpoint].instructions);
+    }
+    
+    // Add strategy instructions if it exists
+    if (strategy && STRATEGY_CONFIG[strategy]) {
+      systemPromptParts.push(STRATEGY_CONFIG[strategy].instructions);
+    }
+    
+    // Build the complete system prompt
+    systemPrompt = systemPromptParts.join('\n\n');
   }
   
-  history.unshift(systemMessage);
+  // Replace date placeholder if present
+  systemPrompt = systemPrompt.replaceAll('{{Today}}', new Date().toISOString().split('T')[0]);
+  
+  // Always update system message with the complete prompt
+  systemMessage.text = systemPrompt;
+  const { defaultSystemPurposeId } = require('../../../data') as { defaultSystemPurposeId: SystemPurposeId };
+  systemMessage.purposeId = defaultSystemPurposeId;
+  console.log('[Chat] updatePurposeInHistory: system message set', { 
+    phase,
+    textLength: systemMessage.text.length, 
+    hasStandpoint: !!standpoint, 
+    standpointValue: standpoint,
+    hasStrategy: !!strategy,
+    strategyValue: strategy,
+    hasTopic: !!topic,
+    systemPromptPreview: systemPrompt.substring(0, 300)
+  });
+  
+  historyCopy.unshift(systemMessage);
   // Don't call setMessages here as it will abort the current request
   // The history will be updated when the assistant message is streamed
-  return history;
+  console.log('[Chat] updatePurposeInHistory: returning enhanced history', {
+    totalLength: historyCopy.length,
+    systemMessageText: systemMessage.text.substring(0, 100),
+    userMessages: historyCopy.filter(m => m.role === 'user').length,
+    assistantMessages: historyCopy.filter(m => m.role === 'assistant').length
+  });
+  return historyCopy;
 }

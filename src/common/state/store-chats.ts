@@ -8,6 +8,7 @@ import { Standpoint, ConversationStrategy, ConversationStats } from '~/modules/p
 import { countModelTokens } from '../util/token-counter';
 import { defaultSystemPurposeId, SystemPurposeId, SurveyQuestions, ChatBotType } from '../../data';
 import { IDB_MIGRATION_INITIAL, idbStateStorage } from '../util/idbUtils';
+import { useStudyIdStore } from './store-study-id';
 
 
 /**
@@ -24,11 +25,15 @@ export interface DConversation {
   userTitle?: string;
   autoTitle?: string;
   
+  // Study ID - associated with all conversations
+  studyId?: string;
+  
   // Conversational search configuration
   searchTopic?: string;              // Topic for conversational search
-  standpoint?: Standpoint;           // Chatbot's standpoint: 'supporting' or 'opposing'
+  standpoint?: Standpoint;           // Whether chatbot aligns with user's viewpoint: 'supporting' (aligned) or 'opposing' (challenging)
   strategy?: ConversationStrategy;   // Conversation strategy: 'suggestion' or 'clarification'
   stats?: ConversationStats;         // Conversation statistics for research tracking
+  phase?: 'dialogue' | 'memo';       // Conversation phase: 'dialogue' (guiding) or 'memo' (service assistant)
   
   tokenCount: number;                 // f(messages, llmId)
   created: number;                    // created timestamp
@@ -59,9 +64,14 @@ export function createDConversation(
     strategy?: ConversationStrategy;
   }
 ): DConversation {
+  // Get study ID from store
+  const studyId = useStudyIdStore.getState().studyId;
+  
   return {
     id: uuidv4(),
     messages: [],
+    phase: 'dialogue', // Default to dialogue phase
+    ...(studyId && { studyId }),
     ...(searchConfig?.topic && { searchTopic: searchConfig.topic }),
     ...(searchConfig?.standpoint && { standpoint: searchConfig.standpoint }),
     ...(searchConfig?.strategy && { strategy: searchConfig.strategy }),
@@ -81,10 +91,14 @@ export function createDEvaluation(
     strategy?: ConversationStrategy;
   }
 ): DConversation {
+  // Get study ID from store (inherit from parent conversation or get from store)
+  const studyId = useStudyIdStore.getState().studyId;
+  
   return {
     id: uuidv4(),
     messages: [SurveyQuestions[0], SurveyQuestions[1]],
     conversationId: conversationId,
+    ...(studyId && { studyId }),
     ...(searchConfig?.topic && { searchTopic: searchConfig.topic }),
     ...(searchConfig?.standpoint && { standpoint: searchConfig.standpoint }),
     ...(searchConfig?.strategy && { strategy: searchConfig.strategy }),
@@ -205,6 +219,7 @@ interface ChatActions {
   setAutoTitle: (conversationId: string, autoTitle: string) => void;
   setUserTitle: (conversationId: string, userTitle: string) => void;
   setSearchConfig: (conversationId: string, config: { topic?: string; standpoint?: Standpoint; strategy?: ConversationStrategy }) => void;
+  setConversationPhase: (conversationId: string, phase: 'dialogue' | 'memo') => void;
   getPairedQuestionId: (conversationId: string, messageId: string) => string;
   isConversation: (conversation: DConversation)=>boolean;
   setPairedEvaluationId:(conversationId: string, evaluationId: string)=>void;
@@ -275,6 +290,9 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
           if (!conversation)
             return {};
 
+          // Get study ID from store (use current study ID if conversation doesn't have one)
+          const studyId = useStudyIdStore.getState().studyId;
+
           // create a deep copy of the conversation
           const deepCopy: DConversation = JSON.parse(JSON.stringify(conversation));
           const duplicate: DConversation = {
@@ -286,6 +304,7 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
               typing: false,
             })),
             evaluationId: undefined,
+            ...(studyId && { studyId }), // Ensure duplicate has study ID
             updated: Date.now(),
             abortController: null,
             ephemerals: [],
@@ -310,6 +329,11 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
             conversation.id = uuidv4();
             console.warn('Conversation ID clash, changing ID to', conversation.id);
           }
+        }
+        // Ensure imported conversation has study ID (use current study ID if conversation doesn't have one)
+        const studyId = useStudyIdStore.getState().studyId;
+        if (studyId && !conversation.studyId) {
+          conversation.studyId = studyId;
         }
         get().deleteConversation(conversation.id);
         set(state => {
@@ -526,6 +550,9 @@ export const useChatStore = create<ChatState & ChatActions>()(devtools(
             ...(config.standpoint !== undefined && { standpoint: config.standpoint }),
             ...(config.strategy !== undefined && { strategy: config.strategy }),
           }),
+
+      setConversationPhase: (conversationId: string, phase: 'dialogue' | 'memo') =>
+        get()._editConversation(conversationId, { phase }),
 
       appendEphemeral: (conversationId: string, ephemeral: DEphemeral) =>
         get()._editConversation(conversationId, conversation => {

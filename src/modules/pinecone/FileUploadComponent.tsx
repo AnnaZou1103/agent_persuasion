@@ -228,8 +228,8 @@ export function FileUploadComponent() {
             onChange={(_, value) => value && setStance(value)}
             disabled={isUploading}
           >
-            <Option value="supporting">Supporting - Favor the topic</Option>
-            <Option value="opposing">Opposing - Challenge the topic</Option>
+            <Option value="supporting">Supporting - Align with user's viewpoint</Option>
+            <Option value="opposing">Opposing - Challenge user's viewpoint</Option>
           </Select>
         </FormControl>
 

@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 
+import { Box, Button } from '@mui/joy';
+
 import { CmdRunProdia } from '~/modules/prodia/prodia.client';
 import { CmdRunReact } from '~/modules/aifn/react/react';
 import { FlattenerModal } from '~/modules/aifn/flatten/FlattenerModal';
@@ -27,7 +29,9 @@ import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { ChatMessage } from './components/message/ChatMessage';
 import { TopicSelectionModal } from './components/TopicSelectionModal';
+import { StudyIdInputModal } from './components/StudyIdInputModal';
 import { ConversationTopic } from './topics';
+import { useStudyIdStore } from '~/common/state/store-study-id';
 
 const SPECIAL_ID_ALL_CHATS = 'all-chats';
 
@@ -42,7 +46,7 @@ export function AppChat() {
   const [flattenConversationId, setFlattenConversationId] = React.useState<string | null>(null);
 
   // external state
-  const { activeConversationId, activeEvaluationId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId, setSearchConfig } = useChatStore(state => {
+  const { activeConversationId, activeEvaluationId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId, setSearchConfig, setConversationPhase, _editConversation } = useChatStore(state => {
     const conversation = state.conversations.find(conversation => conversation.id === state.activeConversationId);
     const isConversationEmpty = conversation ? !conversation.messages.length : true;
     const hasAnyContent = state.conversations.length > 1 || !isConversationEmpty;
@@ -57,13 +61,27 @@ export function AppChat() {
       setAutoTitle: state.setAutoTitle,
       setActiveEvaluationId: state.setActiveEvaluationId,
       setSearchConfig: state.setSearchConfig,
+      setConversationPhase: state.setConversationPhase,
+      _editConversation: state._editConversation,
     };
   }, shallow);
+
+  // Get study ID from store
+  const studyId = useStudyIdStore(state => state.studyId);
+  
+  // Check if we should show study ID input modal
+  // Show if: no study ID is set
+  const shouldShowStudyIdInput = React.useMemo(() => {
+    return !studyId;
+  }, [studyId]);
 
   // Get current conversation details
   const currentConversation = useChatStore(state => 
     state.conversations.find(c => c.id === activeConversationId)
   );
+  
+  // Get conversation phase (default to 'dialogue')
+  const conversationPhase = currentConversation?.phase || 'dialogue';
 
   // Check if conversation has user messages (conversation has started)
   const hasUserMessages = currentConversation 
@@ -71,18 +89,61 @@ export function AppChat() {
     : false;
 
   // Check if we should show topic selection modal
-  // Show if: conversation is empty AND no topic selected AND conversation hasn't started
+  // Show if: study ID exists AND conversation is empty AND no topic selected AND conversation hasn't started
   const shouldShowTopicSelection = React.useMemo(() => {
+    if (!studyId) return false; // Don't show if no study ID
     if (!activeConversationId || !currentConversation) return false;
     if (hasUserMessages) return false; // Don't show if conversation has started
     if (currentConversation.searchTopic) return false; // Don't show if topic already selected
     return true; // Show if conversation is empty and no topic
-  }, [activeConversationId, currentConversation, hasUserMessages]);
+  }, [studyId, activeConversationId, currentConversation, hasUserMessages]);
+
+  // Handle study ID set
+  const handleStudyIdSet = React.useCallback(() => {
+    // Update current conversation with study ID if it doesn't have one
+    if (activeConversationId) {
+      const currentStudyId = useStudyIdStore.getState().studyId;
+      if (currentStudyId) {
+        const conversation = useChatStore.getState().conversations.find(c => c.id === activeConversationId);
+        if (conversation && !conversation.studyId) {
+          _editConversation(activeConversationId, { studyId: currentStudyId });
+        }
+      }
+    }
+    
+    // Ensure topic config is generated (in case it wasn't generated during setStudyId)
+    const { topicConfig, generateTopicConfig } = useStudyIdStore.getState();
+    if (!topicConfig) {
+      generateTopicConfig();
+    }
+    
+    // Study ID is now set, topic selection will show automatically if needed
+    // The modal will close automatically when studyId state updates
+  }, [activeConversationId, _editConversation]);
 
   // Handle topic selection
   const handleTopicSelect = (topic: ConversationTopic) => {
     if (activeConversationId) {
-      setSearchConfig(activeConversationId, { topic });
+      // Get topic configuration (standpoint and strategy) from store
+      const topicConfig = useStudyIdStore.getState().getTopicConfig(topic);
+      
+      if (topicConfig) {
+        // Set topic, standpoint, and strategy together
+        setSearchConfig(activeConversationId, {
+          topic,
+          standpoint: topicConfig.standpoint,
+          strategy: topicConfig.strategy,
+        });
+        console.log('[AppChat] Topic selected with config:', {
+          topic,
+          standpoint: topicConfig.standpoint,
+          strategy: topicConfig.strategy,
+        });
+      } else {
+        // Fallback: just set topic if config not found
+        console.warn('[AppChat] Topic config not found for topic:', topic);
+        setSearchConfig(activeConversationId, { topic });
+      }
     }
   };
 
@@ -167,7 +228,17 @@ export function AppChat() {
         return await handleImagineFromText(conversationId, userText);
       
       // Create new history with user message
-      const newHistory = [...conversation.messages, createDMessage('user', userText)];
+      const userMessage = createDMessage('user', userText);
+      const newHistory = [...conversation.messages, userMessage];
+      
+      console.log('[AppChat] handleSendUserMessage', {
+        conversationId,
+        userText: userText.substring(0, 50),
+        conversationMessagesLength: conversation.messages.length,
+        newHistoryLength: newHistory.length,
+        lastMessageRole: newHistory[newHistory.length - 1]?.role,
+        phase: conversation.phase
+      });
       
       // Save user message immediately so it displays right away
       setMessages(conversationId, newHistory);
@@ -246,7 +317,13 @@ export function AppChat() {
   }
 
   return <>
-    {/* Topic Selection Modal */}
+    {/* Study ID Input Modal - shown before topic selection */}
+    <StudyIdInputModal
+      open={shouldShowStudyIdInput}
+      onStudyIdSet={handleStudyIdSet}
+    />
+
+    {/* Topic Selection Modal - only shown after study ID is set */}
     <TopicSelectionModal
       open={shouldShowTopicSelection}
       onSelectTopic={handleTopicSelect}

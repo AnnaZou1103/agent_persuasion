@@ -32,6 +32,7 @@ import { pdfToText } from '~/common/util/pdfToText';
 import { useChatStore,createDMessage, createDEvaluation, conversationTitle} from '~/common/state/store-chats';
 import { useGlobalShortcut } from '~/common/components/useGlobalShortcut';
 import { useUIPreferencesStore, useUIStateStore } from '~/common/state/store-ui';
+import { useStudyIdStore } from '~/common/state/store-study-id';
 
 import { CameraCaptureButton } from './CameraCaptureButton';
 import { ChatModeId, useChatModeStore } from '../../store-chatmode';
@@ -183,6 +184,45 @@ export function Composer(props: {
   })
 
   // Check if conversation has been used (has more than just the initial greeting)
+  // Get conversation phase for Save button logic and phase switch button
+  const conversation = useChatStore(state => 
+    state.conversations.find(c => c.id === props.conversationId)
+  );
+  const conversationPhase = conversation?.phase || 'dialogue';
+  const hasTopic = !!conversation?.searchTopic;
+  // Check if user has sent at least one message
+  const hasUserMessages = conversation?.messages.some(msg => msg.role === 'user') || false;
+  // Check if user has sent at least one message AFTER switching to memo phase
+  // When phase switches to memo, the system message is updated
+  // We need to check if there are user messages sent after the phase switch
+  const hasMemoMessages = React.useMemo(() => {
+    if (conversationPhase !== 'memo' || !conversation) return false;
+    
+    // Find all system messages
+    const systemMessages = conversation.messages.filter(msg => msg.role === 'system');
+    if (systemMessages.length === 0) return false;
+    
+    // Get the last system message (which is updated when phase switches to memo)
+    const lastSystemMessage = systemMessages[systemMessages.length - 1];
+    const lastSystemMessageIndex = conversation.messages.findIndex(msg => msg.id === lastSystemMessage.id);
+    
+    if (lastSystemMessageIndex === -1) return false;
+    
+    // Check if there are any user messages after the last system message update
+    // This means messages sent after phase switch to memo
+    const messagesAfterPhaseSwitch = conversation.messages.slice(lastSystemMessageIndex + 1);
+    const hasUserMessageAfterSwitch = messagesAfterPhaseSwitch.some(msg => msg.role === 'user');
+    
+    console.log('[Composer] Checking memo messages:', {
+      phase: conversationPhase,
+      lastSystemMessageIndex,
+      messagesAfterSwitch: messagesAfterPhaseSwitch.length,
+      hasUserMessageAfterSwitch,
+    });
+    
+    return hasUserMessageAfterSwitch;
+  }, [conversationPhase, conversation]);
+
   const hasConversationActivity = useChatStore(state => {
     const conversation = state.conversations.find(c => c.id === props.conversationId);
     if (!conversation) {
@@ -490,11 +530,13 @@ export function Composer(props: {
         })),
       });
       const chatTitle = conversationTitle(latestConversation) || undefined;
+      const studyId = latestConversation.studyId || useStudyIdStore.getState().studyId || undefined;
       const response: StoragePutSchema = await apiAsyncNode.trade.storagePut.mutate({
         ownerId: conversationId,
         dataType: 'CHAT_V1',
         dataTitle: chatTitle,
         dataObject: chatV1,
+        studyId: studyId || undefined,
         expiresSeconds: 0
       });
       setChatLinkResponse(response);
@@ -753,6 +795,61 @@ export function Composer(props: {
                 )}
             </Box>
 
+            {/* Phase Switch Button - shown below Chat button in a separate row */}
+            {hasTopic && (
+              <Box sx={{ display: 'flex', mt: 1 }}>
+                <Button
+                  fullWidth
+                  variant="soft"
+                  color="neutral"
+                  disabled={!hasUserMessages || conversationPhase === 'memo'}
+                  onClick={async () => {
+                    if (props.conversationId) {
+                      // Switch phase first
+                      useChatStore.getState().setConversationPhase(props.conversationId, 'memo');
+                      console.log('[Composer] Switched to memo phase');
+                      
+                      // Wait a bit for the state to update
+                      await new Promise(resolve => setTimeout(resolve, 10));
+                      
+                      // Immediately update system message to conversation.messages
+                      // This ensures the updated system message is saved to MongoDB
+                      const { updatePurposeInHistory } = await import('../../editors/editors');
+                      const conversation = useChatStore.getState().conversations.find(c => c.id === props.conversationId);
+                      if (conversation) {
+                        // Get current messages and update system message
+                        const enhancedHistory = updatePurposeInHistory(props.conversationId, conversation.messages);
+                        const systemMessage = enhancedHistory.find(msg => msg.role === 'system');
+                        if (systemMessage) {
+                          const existingSystemIndex = conversation.messages.findIndex(msg => msg.role === 'system');
+                          if (existingSystemIndex >= 0) {
+                            // Update existing system message
+                            const updatedMessages = [...conversation.messages];
+                            updatedMessages[existingSystemIndex] = systemMessage;
+                            useChatStore.getState().setMessages(props.conversationId, updatedMessages);
+                            console.log('[Composer] Updated system message after phase switch', {
+                              systemMessageText: systemMessage.text.substring(0, 100),
+                              messageCount: updatedMessages.length
+                            });
+                          } else {
+                            // Add system message if it doesn't exist
+                            const messagesWithSystem = [systemMessage, ...conversation.messages];
+                            useChatStore.getState().setMessages(props.conversationId, messagesWithSystem);
+                            console.log('[Composer] Added system message after phase switch', {
+                              systemMessageText: systemMessage.text.substring(0, 100),
+                              messageCount: messagesWithSystem.length
+                            });
+                          }
+                        }
+                      }
+                    }
+                  }}
+                >
+                  {conversationPhase === 'memo' ? 'Memo phase active' : "I'm ready to write my memo"}
+                </Button>
+              </Box>
+            )}
+
 
             {/* [desktop] other buttons (aligned to bottom for now, and mutually exclusive) */}
             <Box sx={{ flexGrow: 1, flexDirection: 'column', gap: 1, justifyContent: 'flex-end'}}>
@@ -767,11 +864,11 @@ export function Composer(props: {
               <Button
                   fullWidth variant='soft' 
                   color={chatLinkResponse?.type === 'success'? 'success' : chatLinkResponse?.type === 'error'? 'danger' : 'primary'}
-                  disabled={!props.conversationId || !chatLLM || !hasConversationActivity}
+                  disabled={!props.conversationId || !chatLLM || !hasConversationActivity || conversationPhase !== 'memo' || !hasMemoMessages}
                   loading={chatLinkUploading}
                   onClick={handleSaveClicked}
                 >
-                {chatLinkResponse?.type === 'success' ? 'Access code: NEU2025' : chatLinkResponse?.type === 'error'? 'Please try again': 'Save'}
+                {chatLinkResponse?.type === 'success' ? 'Access code: NEU2025' : chatLinkResponse?.type === 'error'? 'Please try again': 'Submit'}
               </Button>
 
             </Box>

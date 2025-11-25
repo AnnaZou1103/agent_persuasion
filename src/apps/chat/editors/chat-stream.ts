@@ -29,9 +29,8 @@ export async function runAssistantUpdatingState(conversationId: string, history:
   const enhancedHistory = updatePurposeInHistory(conversationId, history);
   console.log('[Chat] Enhanced history', { length: enhancedHistory.length, systemMessage: enhancedHistory[0] });
 
-  // Ensure system message is saved to conversation.messages
-  // We'll save it after the stream completes to avoid interfering with the streaming
-  // Store the system message for later use
+  // Ensure system message is saved to conversation.messages AFTER streaming completes
+  // We store it now but save it later to avoid interfering with the streaming
   const systemMessageToSave = enhancedHistory[0]?.role === 'system' ? enhancedHistory[0] : null;
 
   // Update the assistant message purpose
@@ -50,6 +49,8 @@ export async function runAssistantUpdatingState(conversationId: string, history:
   startTyping(conversationId, null);
 
   // Save system message to conversation.messages after streaming is complete
+  // This ensures the updated system message is saved to MongoDB
+  // Use _editConversation directly to avoid aborting the request
   if (systemMessageToSave) {
     const conversation = useChatStore.getState().conversations.find(c => c.id === conversationId);
     if (conversation) {
@@ -59,7 +60,11 @@ export async function runAssistantUpdatingState(conversationId: string, history:
         // Add system message to conversation.messages if it doesn't exist
         const currentMessages = conversation.messages;
         const messagesWithSystem = [systemMessageToSave, ...currentMessages];
-        setMessages(conversationId, messagesWithSystem);
+        // Use _editConversation directly to avoid aborting
+        useChatStore.getState()._editConversation(conversationId, {
+          messages: messagesWithSystem,
+          updated: Date.now(),
+        });
         console.log('[Chat] Added system message to conversation.messages after streaming', { 
           systemMessageText: systemMessageToSave.text.substring(0, 50),
           totalMessages: messagesWithSystem.length
@@ -70,8 +75,15 @@ export async function runAssistantUpdatingState(conversationId: string, history:
         if (existingSystemIndex >= 0 && conversation.messages[existingSystemIndex].text !== systemMessageToSave.text) {
           const updatedMessages = [...conversation.messages];
           updatedMessages[existingSystemIndex] = systemMessageToSave;
-          setMessages(conversationId, updatedMessages);
-          console.log('[Chat] Updated system message in conversation.messages after streaming');
+          // Use _editConversation directly to avoid aborting
+          useChatStore.getState()._editConversation(conversationId, {
+            messages: updatedMessages,
+            updated: Date.now(),
+          });
+          console.log('[Chat] Updated system message in conversation.messages after streaming', {
+            oldText: conversation.messages[existingSystemIndex].text.substring(0, 50),
+            newText: systemMessageToSave.text.substring(0, 50)
+          });
         }
       }
     }

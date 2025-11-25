@@ -22,6 +22,9 @@ model LinkStorage {
   dataSize  Int
   data      Json
 
+  // Study ID - associated with conversations for research tracking
+  studyId String?
+
   upVotes    Int @default(0)
   downVotes  Int @default(0)
   flagsCount Int @default(0)

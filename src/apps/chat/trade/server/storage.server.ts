@@ -22,6 +22,7 @@ const storagePutInputSchema = z.object({
   dataType: dataTypesSchema,
   dataTitle: z.string().optional(),
   dataObject: dataSchema,
+  studyId: z.string().optional(),
   expiresSeconds: z.number().optional(),
 });
 
@@ -51,6 +52,7 @@ export const storageGetOutputSchema = z.union([
     dataType: dataTypesSchema,
     dataTitle: z.string().nullable(),
     dataObject: dataSchema,
+    studyId: z.string().nullable(),
     storedAt: z.date(),
     expiresAt: z.date().nullable(),
   }),
@@ -83,7 +85,7 @@ export const storagePutProcedure =
     .output(storagePutOutputSchema)
     .mutation(async ({ input }) => {
 
-      const { ownerId, dataType, dataTitle, dataObject, expiresSeconds} = input;
+      const { ownerId, dataType, dataTitle, dataObject, studyId, expiresSeconds} = input;
 
       const record = await prisma.linkStorage.findUnique({
         where: {
@@ -107,6 +109,7 @@ export const storagePutProcedure =
             dataTitle,
             dataSize: JSON.stringify(dataObject).length, // data size estimate
             data: dataObject,
+            studyId: studyId || null,
             expiresAt: expiresSeconds === 0
               ? undefined // never expires
               : new Date(Date.now() + 1000 * (expiresSeconds || DEFAULT_EXPIRES_SECONDS)), // default
@@ -127,6 +130,7 @@ export const storagePutProcedure =
           },
           data: {
             data: dataObject,
+            ...(studyId !== undefined && { studyId: studyId || null }),
           },
         });
         return {
@@ -154,6 +158,7 @@ export const storageGetProcedure =
           dataType: true,
           dataTitle: true,
           data: true,
+          studyId: true,
           createdAt: true,
           expiresAt: true,
         },
@@ -204,6 +209,7 @@ export const storageGetProcedure =
         dataType: result.dataType,
         dataTitle: result.dataTitle,
         dataObject: result.data as any,
+        studyId: result.studyId,
         storedAt: result.createdAt,
         expiresAt: result.expiresAt,
       };
