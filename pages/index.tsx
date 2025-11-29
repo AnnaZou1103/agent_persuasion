@@ -22,8 +22,23 @@ export default function ChatPage() {
     }
   }, [studyId, router]);
 
+  // Redirect to news page if study ID is set but user hasn't seen instructions in this session
+  React.useEffect(() => {
+    if (studyId && router.pathname === '/') {
+      const hasSeenInstructions = typeof window !== 'undefined' && sessionStorage.getItem('hasSeenInstructions') === 'true';
+      if (!hasSeenInstructions) {
+        router.replace('/news');
+      }
+    }
+  }, [studyId, router]);
+
   // Don't render chat if no study ID (will redirect to news)
   if (!studyId) {
+    return null;
+  }
+
+  // Don't render chat if user hasn't seen instructions (will redirect to news)
+  if (typeof window !== 'undefined' && sessionStorage.getItem('hasSeenInstructions') !== 'true') {
     return null;
   }
 

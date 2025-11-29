@@ -31,7 +31,7 @@ import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { ChatMessage } from './components/message/ChatMessage';
 import { TopicSelectionModal } from './components/TopicSelectionModal';
-import { ConversationTopic } from './topics';
+import { ConversationTopic, CONVERSATION_TOPICS } from './topics';
 import { useStudyIdStore } from '~/common/state/store-study-id';
 
 const SPECIAL_ID_ALL_CHATS = 'all-chats';
@@ -47,7 +47,7 @@ export function AppChat() {
   const [flattenConversationId, setFlattenConversationId] = React.useState<string | null>(null);
 
   // external state
-  const { activeConversationId, activeEvaluationId, activeMemoId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId, setActiveMemoId, setSearchConfig, setConversationPhase, _editConversation, getPairedMemoId } = useChatStore(state => {
+  const { activeConversationId, activeEvaluationId, activeMemoId, isConversationEmpty, hasAnyContent, duplicateConversation, deleteAllConversations, setMessages, setAutoTitle, setActiveEvaluationId, setActiveMemoId, setSearchConfig, setConversationPhase, _editConversation, getPairedMemoId, createConversation } = useChatStore(state => {
     const conversation = state.conversations.find(conversation => conversation.id === state.activeConversationId);
     const isConversationEmpty = conversation ? !conversation.messages.length : true;
     const hasAnyContent = state.conversations.length > 1 || !isConversationEmpty;
@@ -67,6 +67,7 @@ export function AppChat() {
       setConversationPhase: state.setConversationPhase,
       _editConversation: state._editConversation,
       getPairedMemoId: state.getPairedMemoId,
+      createConversation: state.createConversation,
     };
   }, shallow);
 
@@ -89,16 +90,51 @@ export function AppChat() {
     ? currentConversation.messages.some(msg => msg.role === 'user')
     : false;
 
+  // Calculate which topics have already been discussed
+  // A topic is considered "discussed" if there's a conversation with that topic that has user messages
+  const allConversations = useChatStore(state => state.conversations);
+  const discussedTopics = React.useMemo(() => {
+    const topics: ConversationTopic[] = [];
+    
+    for (const conversation of allConversations) {
+      if (conversation.searchTopic) {
+        // Check if this topic matches any of the predefined topics
+        const matchingTopic = CONVERSATION_TOPICS.find(topic => topic === conversation.searchTopic);
+        if (matchingTopic) {
+          // Check if this conversation has user messages (has been discussed)
+          const hasUserMsgs = conversation.messages.some(msg => msg.role === 'user');
+          if (hasUserMsgs && !topics.includes(matchingTopic)) {
+            topics.push(matchingTopic);
+          }
+        }
+      }
+    }
+    
+    return topics;
+  }, [allConversations]);
+
   // Check if we should show topic selection modal
-  // Show if: study ID exists AND conversation is empty AND no topic selected AND conversation hasn't started
+  // Show if: study ID exists AND user has seen instructions AND (no active conversation OR conversation is empty AND no topic selected AND conversation hasn't started)
   // Don't show if we're on the news/instructions page
   const shouldShowTopicSelection = React.useMemo(() => {
     if (!studyId) return false; // Don't show if no study ID
     if (router.pathname === '/news') return false; // Don't show if on instructions page
-    if (!activeConversationId || !currentConversation) return false;
-    if (hasUserMessages) return false; // Don't show if conversation has started
-    if (currentConversation.searchTopic) return false; // Don't show if topic already selected
-    return true; // Show if conversation is empty and no topic
+    
+    // Check if user has seen instructions in this session
+    const hasSeenInstructions = typeof window !== 'undefined' && sessionStorage.getItem('hasSeenInstructions') === 'true';
+    if (!hasSeenInstructions) return false; // Don't show if user hasn't seen instructions
+    
+    // If no active conversation, show topic selection
+    if (!activeConversationId || !currentConversation) return true;
+    
+    // If conversation has started, don't show
+    if (hasUserMessages) return false;
+    
+    // If topic already selected, don't show
+    if (currentConversation.searchTopic) return false;
+    
+    // Show if conversation is empty and no topic
+    return true;
   }, [studyId, router.pathname, activeConversationId, currentConversation, hasUserMessages]);
 
   // Update conversation with study ID when study ID changes
@@ -121,18 +157,27 @@ export function AppChat() {
 
   // Handle topic selection
   const handleTopicSelect = (topic: ConversationTopic) => {
-    if (activeConversationId) {
-      // Get topic configuration (standpoint and strategy) from store
-      const topicConfig = useStudyIdStore.getState().getTopicConfig(topic);
-      
+    // Get topic configuration (standpoint and strategy) from store
+    const topicConfig = useStudyIdStore.getState().getTopicConfig(topic);
+    
+    // Use the current active conversation (which was created when user clicked "Got it!")
+    // If no active conversation exists, create a new one
+    let conversationId = activeConversationId;
+    if (!conversationId) {
+      createConversation();
+      conversationId = useChatStore.getState().activeConversationId;
+    }
+    
+    if (conversationId) {
       if (topicConfig) {
         // Set topic, standpoint, and strategy together
-        setSearchConfig(activeConversationId, {
+        setSearchConfig(conversationId, {
           topic,
           standpoint: topicConfig.standpoint,
           strategy: topicConfig.strategy,
         });
         console.log('[AppChat] Topic selected with config:', {
+          conversationId,
           topic,
           standpoint: topicConfig.standpoint,
           strategy: topicConfig.strategy,
@@ -140,7 +185,7 @@ export function AppChat() {
       } else {
         // Fallback: just set topic if config not found
         console.warn('[AppChat] Topic config not found for topic:', topic);
-        setSearchConfig(activeConversationId, { topic });
+        setSearchConfig(conversationId, { topic });
       }
     }
   };
@@ -347,6 +392,7 @@ export function AppChat() {
     <TopicSelectionModal
       open={shouldShowTopicSelection}
       onSelectTopic={handleTopicSelect}
+      discussedTopics={discussedTopics}
     />
 
     {shouldShowMemoSplit ? (
