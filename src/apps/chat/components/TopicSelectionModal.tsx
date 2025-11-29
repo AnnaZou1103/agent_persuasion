@@ -38,10 +38,6 @@ export function TopicSelectionModal(props: {
   const isTopicDiscussed = (topic: ConversationTopic) => discussedTopics.includes(topic);
 
   const handleTopicSelect = (topic: ConversationTopic) => {
-    // Don't allow selecting already discussed topics
-    if (isTopicDiscussed(topic)) {
-      return;
-    }
     props.onSelectTopic(topic);
   };
 
@@ -89,15 +85,12 @@ export function TopicSelectionModal(props: {
                   key={topic}
                   variant={isDiscussed ? "soft" : "outlined"}
                   sx={{
-                    cursor: isDiscussed ? 'not-allowed' : 'pointer',
-                    opacity: isDiscussed ? 0.6 : 1,
+                    cursor: 'pointer',
                     transition: 'all 0.2s',
-                    ...(isDiscussed ? {} : {
-                      '&:hover': {
-                        boxShadow: 'md',
-                        borderColor: 'primary.500',
-                      },
-                    }),
+                    '&:hover': {
+                      boxShadow: 'md',
+                      borderColor: 'primary.500',
+                    },
                   }}
                   onClick={() => handleTopicSelect(topic)}
                 >
