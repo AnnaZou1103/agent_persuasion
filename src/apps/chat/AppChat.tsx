@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { shallow } from 'zustand/shallow';
+import { useRouter } from 'next/router';
 import { v4 as uuidv4 } from 'uuid';
 
 import { Box, Button } from '@mui/joy';
@@ -30,7 +31,6 @@ import { Allotment } from "allotment";
 import "allotment/dist/style.css";
 import { ChatMessage } from './components/message/ChatMessage';
 import { TopicSelectionModal } from './components/TopicSelectionModal';
-import { StudyIdInputModal } from './components/StudyIdInputModal';
 import { ConversationTopic } from './topics';
 import { useStudyIdStore } from '~/common/state/store-study-id';
 
@@ -70,14 +70,11 @@ export function AppChat() {
     };
   }, shallow);
 
+  // Router for navigation
+  const router = useRouter();
+
   // Get study ID from store
   const studyId = useStudyIdStore(state => state.studyId);
-  
-  // Check if we should show study ID input modal
-  // Show if: no study ID is set
-  const shouldShowStudyIdInput = React.useMemo(() => {
-    return !studyId;
-  }, [studyId]);
 
   // Get current conversation details
   const currentConversation = useChatStore(state => 
@@ -94,36 +91,33 @@ export function AppChat() {
 
   // Check if we should show topic selection modal
   // Show if: study ID exists AND conversation is empty AND no topic selected AND conversation hasn't started
+  // Don't show if we're on the news/instructions page
   const shouldShowTopicSelection = React.useMemo(() => {
     if (!studyId) return false; // Don't show if no study ID
+    if (router.pathname === '/news') return false; // Don't show if on instructions page
     if (!activeConversationId || !currentConversation) return false;
     if (hasUserMessages) return false; // Don't show if conversation has started
     if (currentConversation.searchTopic) return false; // Don't show if topic already selected
     return true; // Show if conversation is empty and no topic
-  }, [studyId, activeConversationId, currentConversation, hasUserMessages]);
+  }, [studyId, router.pathname, activeConversationId, currentConversation, hasUserMessages]);
 
-  // Handle study ID set
-  const handleStudyIdSet = React.useCallback(() => {
-    // Update current conversation with study ID if it doesn't have one
-    if (activeConversationId) {
-      const currentStudyId = useStudyIdStore.getState().studyId;
-      if (currentStudyId) {
-        const conversation = useChatStore.getState().conversations.find(c => c.id === activeConversationId);
-        if (conversation && !conversation.studyId) {
-          _editConversation(activeConversationId, { studyId: currentStudyId });
-        }
+  // Update conversation with study ID when study ID changes
+  React.useEffect(() => {
+    if (studyId && activeConversationId) {
+      const conversation = useChatStore.getState().conversations.find(c => c.id === activeConversationId);
+      if (conversation && !conversation.studyId) {
+        _editConversation(activeConversationId, { studyId });
       }
     }
     
-    // Ensure topic config is generated (in case it wasn't generated during setStudyId)
-    const { topicConfig, generateTopicConfig } = useStudyIdStore.getState();
-    if (!topicConfig) {
-      generateTopicConfig();
+    // Ensure topic config is generated when study ID is set
+    if (studyId) {
+      const { topicConfig, generateTopicConfig } = useStudyIdStore.getState();
+      if (!topicConfig) {
+        generateTopicConfig();
+      }
     }
-    
-    // Study ID is now set, topic selection will show automatically if needed
-    // The modal will close automatically when studyId state updates
-  }, [activeConversationId, _editConversation]);
+  }, [studyId, activeConversationId, _editConversation]);
 
   // Handle topic selection
   const handleTopicSelect = (topic: ConversationTopic) => {
@@ -349,12 +343,6 @@ export function AppChat() {
   }, [activeConversationId, activeMemoId, getPairedMemoId, setActiveMemoId]);
 
   return <>
-    {/* Study ID Input Modal - shown before topic selection */}
-    <StudyIdInputModal
-      open={shouldShowStudyIdInput}
-      onStudyIdSet={handleStudyIdSet}
-    />
-
     {/* Topic Selection Modal - only shown after study ID is set */}
     <TopicSelectionModal
       open={shouldShowTopicSelection}

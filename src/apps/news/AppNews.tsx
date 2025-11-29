@@ -1,22 +1,53 @@
 import * as React from 'react';
+import { useRouter } from 'next/router';
 
-import { Box, Button, Card, CardContent, Container, IconButton, Typography } from '@mui/joy';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { Box, Button, Card, CardContent, Container, Divider, Input, Typography } from '@mui/joy';
 
 import { Brand } from '~/common/brand';
 import { Link } from '~/common/components/Link';
 import { capitalizeFirstLetter } from '~/common/util/textUtils';
+import { useStudyIdStore } from '~/common/state/store-study-id';
 
 import { NewsItems } from './news.data';
 
 
 export function AppNews() {
+  const router = useRouter();
+  const { studyId, setStudyId } = useStudyIdStore();
+  
   // state
   const [lastNewsIdx, setLastNewsIdx] = React.useState<number>(0);
+  const [studyIdInput, setStudyIdInput] = React.useState('');
+  const [error, setError] = React.useState('');
 
   // news selection
   const news = NewsItems.filter((_, idx) => idx <= lastNewsIdx);
   const firstNews = news[0] ?? null;
+
+  // Handle study ID submission
+  const handleStudyIdSubmit = () => {
+    const trimmedId = studyIdInput.trim();
+    if (!trimmedId) {
+      setError('Please enter a study ID');
+      return;
+    }
+    try {
+      setStudyId(trimmedId);
+      setStudyIdInput('');
+      setError('');
+      // Navigate to chat page after setting study ID
+      router.push('/');
+    } catch (error) {
+      console.error('Error setting study ID:', error);
+      setError('Failed to save study ID. Please try again.');
+    }
+  };
+
+  const handleKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      handleStudyIdSubmit();
+    }
+  };
 
   return (
 
@@ -65,10 +96,53 @@ export function AppNews() {
           </Card>
         </Container>
 
-
-      <Button variant='solid' color='neutral' size='lg' component={Link} href='/' noLinkStyle>
-        Got it!
-      </Button>
+      {/* Study ID Input Section - only show if no study ID */}
+      {!studyId ? (
+        <Container disableGutters maxWidth='sm'>
+          <Card>
+            <CardContent sx={{ position: 'relative', pr: 0 }}>
+              <Typography level='h2' fontSize="xl" sx={{ mb: 0.5 }} component='div'>
+                Enter Study ID
+              </Typography>
+              <Typography level="body-md" sx={{ mb: 2 }}>
+                Please enter your study ID to continue. This ID will be associated with all your conversations.
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Input
+                  placeholder="Enter your study ID"
+                  value={studyIdInput}
+                  onChange={(e) => {
+                    setStudyIdInput(e.target.value);
+                    setError('');
+                  }}
+                  onKeyPress={handleKeyPress}
+                  error={!!error}
+                  autoFocus
+                  sx={{ width: '100%' }}
+                />
+                {error && (
+                  <Typography level="body-sm" color="danger">
+                    {error}
+                  </Typography>
+                )}
+                <Button
+                  onClick={handleStudyIdSubmit}
+                  variant="solid"
+                  color="primary"
+                  size='lg'
+                  sx={{ width: '100%' }}
+                >
+                  Continue
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Container>
+      ) : (
+        <Button variant='solid' color='neutral' size='lg' component={Link} href='/' noLinkStyle>
+          Got it!
+        </Button>
+      )}
 
       {/*<Typography sx={{ textAlign: 'center' }}>*/}
       {/*  Enjoy!*/}

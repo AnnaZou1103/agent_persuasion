@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { shallow } from 'zustand/shallow';
 
-import { Box, Button, ButtonGroup, Card, Grid, IconButton, Stack, Textarea, Tooltip, Typography, useTheme, Alert } from '@mui/joy';
+import { Box, Button, ButtonGroup, Card, Divider, Grid, IconButton, Input, Modal, ModalDialog, ModalOverflow, Stack, Textarea, Tooltip, Typography, useTheme, Alert } from '@mui/joy';
 import { ColorPaletteProp, SxProps, VariantProp } from '@mui/joy/styles/types';
 import AttachFileOutlinedIcon from '@mui/icons-material/AttachFileOutlined';
 import CallIcon from '@mui/icons-material/Call';
@@ -156,6 +156,7 @@ export function Composer(props: {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [chatLinkUploading, setChatLinkUploading] = React.useState(false);
   const [chatLinkResponse, setChatLinkResponse] = React.useState<StoragePutSchema | null>(null);
+  const [showStudyIdAlert, setShowStudyIdAlert] = React.useState(false);
 
   // external state
   const theme = useTheme();
@@ -174,6 +175,7 @@ export function Composer(props: {
     };
   }, shallow);
   const { chatLLMId, chatLLM } = useChatLLM();
+  const studyId = useStudyIdStore(state => state.studyId);
 
   const isEvaluation = useChatStore(state => {
     return state.activeEvaluationId!=null;
@@ -533,15 +535,9 @@ export function Composer(props: {
       if (response.type === 'success') {
         const chatTitle = conversationTitle(latestConversation) || undefined;
         addChatLinkItem(chatTitle, response.objectId, response.createdAt, response.expiresAt, response.deletionKey);
-        // Open Google Apps Script URL in a new tab after successful submit
-        // Add a small delay to ensure state updates are complete
-        setTimeout(() => {
-          try {
-            window.open('https://script.google.com/macros/s/AKfycby4e9Zn9Gmy1mEuSge1zTtNuFl7dniY7uQph47RGeE4EJa8oqKCXsGppAE_5d6l6Fhe/exec?page=post', '_blank');
-          } catch (error) {
-            console.error('[Submit] Failed to open new tab:', error);
-          }
-        }, 100);
+        
+        // Show study ID modal
+        setShowStudyIdAlert(true);
       }
     } catch (error: any) {
       setChatLinkResponse({
@@ -837,7 +833,7 @@ export function Composer(props: {
 
             </Box>
 
-            <Box sx={{ display: 'flex' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <Button
                   fullWidth variant='soft' 
                   color={chatLinkResponse?.type === 'success'? 'success' : chatLinkResponse?.type === 'error'? 'danger' : 'primary'}
@@ -847,7 +843,6 @@ export function Composer(props: {
                 >
                 {chatLinkResponse?.type === 'success' ? 'Submitted ✓' : chatLinkResponse?.type === 'error'? 'Please try again': 'Submit'}
               </Button>
-
             </Box>
 
 
@@ -871,6 +866,64 @@ export function Composer(props: {
             onReducedText={handleContentReducerText} onClose={handleContentReducerClose}
           />
         }
+
+        {/* Study ID Modal - shown after successful submission */}
+        <Modal open={showStudyIdAlert} onClose={() => {}} disableEscapeKeyDown>
+          <ModalOverflow>
+            <ModalDialog
+              sx={{
+                minWidth: { xs: 360, sm: 500, md: 600 },
+                maxWidth: 600,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 3,
+              }}
+            >
+              <Box sx={{ mb: -1, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography level="title-lg">
+                  Memo Submitted Successfully!
+                </Typography>
+              </Box>
+
+              <Divider />
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography level="body-md">
+                Thank you for submitting your memo. You will now be redirected to the <strong>post-survey</strong>. Please keep the following Study ID. You will be asked to enter it in a follow-up survey.
+                </Typography>
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Typography level="body-md" sx={{ fontWeight: 600, fontSize: '1.1rem' }}>
+                    Study ID: <strong>{studyId || 'Not set'}</strong>
+                  </Typography>
+                </Box>
+
+                <Typography level="body-md" sx={{ color: 'text.secondary' }}>
+                  Please copy or write down this Study ID before you continue (for example, you can select it and press <strong>Ctrl + C</strong> on Windows or <strong>Cmd + C</strong> on Mac).
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                <Button
+                  variant="solid"
+                  color="primary"
+                  size="lg"
+                  onClick={() => {
+                    setShowStudyIdAlert(false);
+                    // Open post survey in new window
+                    try {
+                      window.open('https://script.google.com/macros/s/AKfycby4e9Zn9Gmy1mEuSge1zTtNuFl7dniY7uQph47RGeE4EJa8oqKCXsGppAE_5d6l6Fhe/exec?page=post', '_blank');
+                    } catch (error) {
+                      console.error('[Submit] Failed to open new tab:', error);
+                    }
+                  }}
+                >
+                  Got it!
+                </Button>
+              </Box>
+            </ModalDialog>
+          </ModalOverflow>
+        </Modal>
 
       </Grid>
     </Box>
