@@ -7,7 +7,6 @@ import { Brand } from '~/common/brand';
 import { Link } from '~/common/components/Link';
 import { capitalizeFirstLetter } from '~/common/util/textUtils';
 import { useStudyIdStore } from '~/common/state/store-study-id';
-import { useChatStore } from '~/common/state/store-chats';
 
 import { NewsItems } from './news.data';
 
@@ -15,7 +14,6 @@ import { NewsItems } from './news.data';
 export function AppNews() {
   const router = useRouter();
   const { studyId, setStudyId } = useStudyIdStore();
-  const createConversation = useChatStore(state => state.createConversation);
   
   // state
   const [lastNewsIdx, setLastNewsIdx] = React.useState<number>(0);
@@ -151,15 +149,14 @@ export function AppNews() {
           color='neutral' 
           size='lg' 
           onClick={() => {
-            // Create a new conversation before navigating
-            createConversation();
-            
-            // Set sessionStorage marker to indicate user has seen instructions
+            // Set sessionStorage markers to indicate user has seen instructions
+            // and should create a new conversation when selecting topic
             if (typeof window !== 'undefined') {
               sessionStorage.setItem('hasSeenInstructions', 'true');
+              sessionStorage.setItem('shouldCreateNewConversation', 'true');
             }
             
-            // Navigate to chat page with the newly created conversation
+            // Navigate to chat page - conversation will be created when topic is selected
             router.push('/');
           }}
         >

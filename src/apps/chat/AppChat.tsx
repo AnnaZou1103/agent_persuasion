@@ -124,6 +124,11 @@ export function AppChat() {
     const hasSeenInstructions = typeof window !== 'undefined' && sessionStorage.getItem('hasSeenInstructions') === 'true';
     if (!hasSeenInstructions) return false; // Don't show if user hasn't seen instructions
     
+    // Check if this is a new session (new tab) - if so, always show topic selection
+    const shouldCreateNew = typeof window !== 'undefined' && 
+      sessionStorage.getItem('shouldCreateNewConversation') === 'true';
+    if (shouldCreateNew) return true; // New session: always show topic selection
+    
     // If no active conversation, show topic selection
     if (!activeConversationId || !currentConversation) return true;
     
@@ -160,12 +165,52 @@ export function AppChat() {
     // Get topic configuration (standpoint and strategy) from store
     const topicConfig = useStudyIdStore.getState().getTopicConfig(topic);
     
-    // Use the current active conversation (which was created when user clicked "Got it!")
-    // If no active conversation exists, create a new one
-    let conversationId = activeConversationId;
-    if (!conversationId) {
-      createConversation();
-      conversationId = useChatStore.getState().activeConversationId;
+    // Check if we should create a new conversation
+    // If this is a new session (new tab), check if we should create new or update existing
+    const shouldCreateNew = typeof window !== 'undefined' && 
+      sessionStorage.getItem('shouldCreateNewConversation') === 'true';
+    
+    const currentState = useChatStore.getState();
+    const currentConv = currentState.conversations.find(c => c.id === currentState.activeConversationId);
+    
+    // Check if current conversation is empty (no user messages, no topic)
+    // A conversation is considered "empty" if:
+    // 1. It has no user messages (user hasn't started the conversation)
+    // 2. It has no topic (topic hasn't been selected yet)
+    const isEmptyConversation = currentConv && 
+      !currentConv.messages.some(msg => msg.role === 'user') &&
+      !currentConv.searchTopic;
+    
+    let conversationId: string | null = null;
+    
+    if (shouldCreateNew) {
+      // New session: if current conversation is empty, use it; otherwise create new
+      if (isEmptyConversation && currentState.activeConversationId) {
+        // Use the existing empty conversation (likely the default one)
+        conversationId = currentState.activeConversationId;
+        console.log('[AppChat] New session - using existing empty conversation:', conversationId);
+      } else {
+        // Create a new conversation
+        createConversation();
+        conversationId = useChatStore.getState().activeConversationId;
+        console.log('[AppChat] New session - created new conversation:', conversationId);
+      }
+      // Clear the marker after processing
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('shouldCreateNewConversation');
+      }
+    } else {
+      // Existing session: check if current conversation is empty
+      if (isEmptyConversation && currentState.activeConversationId) {
+        // Use the existing empty conversation
+        conversationId = currentState.activeConversationId;
+        console.log('[AppChat] Using existing empty conversation:', conversationId);
+      } else {
+        // Create a new conversation
+        createConversation();
+        conversationId = useChatStore.getState().activeConversationId;
+        console.log('[AppChat] Created new conversation:', conversationId);
+      }
     }
     
     if (conversationId) {
