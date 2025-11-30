@@ -912,7 +912,7 @@ export function Composer(props: {
                     setShowStudyIdAlert(false);
                     // Open post survey in new window
                     try {
-                      window.open('https://script.google.com/macros/s/AKfycby4e9Zn9Gmy1mEuSge1zTtNuFl7dniY7uQph47RGeE4EJa8oqKCXsGppAE_5d6l6Fhe/exec?page=post', '_blank');
+                      window.open('https://script.google.com/macros/s/AKfycbw_V-8N8PbegCVonZYylqsPLoR7fHpPks_GAiBpLtSmpSCVATuYHRn50krh1xydQ0aZ/exec?page=post', '_blank');
                     } catch (error) {
                       console.error('[Submit] Failed to open new tab:', error);
                     }
